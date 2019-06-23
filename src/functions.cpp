@@ -79,6 +79,11 @@ void* winevfs__opendir(const char* name) {
     return original(name);
 }
 
+int winevfs__utimensat(int dirfd, const char* pathname, const struct timespec* times, int flags) {
+    static int (*original)(int, const char*, const struct timespec*, int) = (int (*)(int, const char*, const struct timespec*, int))dlsym(RTLD_NEXT, "utimensat");
+    return original(dirfd, pathname, times, flags);
+}
+
 
 
 int open(const char* pathname, int flags, ...) {
@@ -229,6 +234,14 @@ void* opendir(const char* name) {
     name = winevfs_get_path(name, name_intent);
     void* ret = winevfs__opendir(name);
     free((void*)name);
+    return ret;
+}
+
+int utimensat(int dirfd, const char* pathname, const struct timespec* times, int flags) {
+    Intent pathname_intent = Intent_Read;
+    pathname = winevfs_get_path(pathname, pathname_intent);
+    int ret = winevfs__utimensat(dirfd, pathname, times, flags);
+    free((void*)pathname);
     return ret;
 }
 

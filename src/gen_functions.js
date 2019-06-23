@@ -148,6 +148,16 @@ var _functions = [
     args: [
       ["const char*", "name", "r"]
     ]
+  },
+  {
+    ret: "int",
+    name: "utimensat",
+    args: [
+      ["int", "dirfd"],
+      ["const char*", "pathname", "r"],
+      ["const struct timespec*", "times"],
+      ["int", "flags"]
+    ]
   }
 ];
 

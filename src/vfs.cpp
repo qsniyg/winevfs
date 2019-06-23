@@ -313,10 +313,17 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
 
       for (auto it = write_mappings.begin(); it != write_mappings.end(); it++) {
         if (!strncmp(path_lower.c_str(), it->first.c_str(), it->first.size())) {
-          std::filesystem::path newpath = std::filesystem::path(it->second) / std::filesystem::path(path_lower.c_str() + it->first.size());
+          const char* rest = path_lower.c_str() + it->first.size();
+          if (rest[0] == '/')
+            rest++;
+
+          std::filesystem::path newpath = std::filesystem::path(it->second) / std::filesystem::path(rest);
 
           std::lock_guard<std::mutex> read_lock(read_mappings_mutex);
           read_mappings[path_lower] = newpath;
+          //std::cout << it->second << std::endl;
+          //std::cout << path_lower << std::endl;
+          //std::cout << newpath << std::endl;
           return newpath;
         }
       }

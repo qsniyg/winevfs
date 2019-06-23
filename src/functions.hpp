@@ -14,4 +14,5 @@ int winevfs__linkat(int fromfd, const char* from, int tofd, const char* to, int 
 int winevfs__symlinkat(const char* from, int fd, const char* to);
 int winevfs__mkdir(const char* path, unsigned int mode);
 void* winevfs__opendir(const char* name);
+int winevfs__utimensat(int dirfd, const char* pathname, const struct timespec* times, int flags);
 }
