@@ -10,6 +10,7 @@
 #include <mutex>
 #include <string.h>
 #include <iostream>
+#include "functions.hpp"
 
 static std::string lower(std::string& in) {
   std::string out = in;
@@ -17,9 +18,13 @@ static std::string lower(std::string& in) {
   return out;
 }
 
+static int real_stat(const char* str, struct stat* buf) {
+  return winevfs____xstat(_STAT_VER_LINUX, str, buf);
+}
+
 static int fs_stat(std::filesystem::path path, struct stat* buf) {
   std::string path_str = path;
-  return stat(path_str.c_str(), buf);
+  return real_stat(path_str.c_str(), buf);
 }
 
 static bool fs_exists(std::filesystem::path source) {
@@ -34,9 +39,9 @@ static bool fs_isdir(std::filesystem::path source) {
   return S_ISDIR(s.st_mode);
 }
 
-static DIR* fs_readdir(std::filesystem::path source) {
+static DIR* fs_opendir(std::filesystem::path source) {
   std::string path_str = source;
-  return opendir(path_str.c_str());
+  return (DIR*)winevfs__opendir(path_str.c_str());
 }
 
 std::filesystem::path fs_getcwd() {
@@ -68,12 +73,13 @@ static std::filesystem::path abspath(std::filesystem::path source) {
     return source;
 
   std::filesystem::path path = abspath_simple(source);
-  // TODO: replace, maybe cache?
+  // TODO: maybe cache?
   path = fs_getcwd() / path;
   return abspath_simple(path);
   //return std::filesystem::absolute(source);
 }
 
+// TODO: somehow make this work better multi-process
 std::unordered_map<std::string, std::string> read_mappings;
 std::mutex read_mappings_mutex;
 std::unordered_map<std::string, std::string> write_mappings;
@@ -142,7 +148,7 @@ static std::filesystem::path winpath(std::filesystem::path source) {
     path_cache[winparent_lower] = winparent;
 
   if (fs_isdir(winparent)) {
-    DIR* d = fs_readdir(winparent);
+    DIR* d = fs_opendir(winparent);
     struct dirent* entry;
 
     if (d) {
@@ -152,6 +158,8 @@ static std::filesystem::path winpath(std::filesystem::path source) {
           return winparent / filename;
         }
       }
+
+      closedir(d);
     }
   }
 
@@ -162,6 +170,8 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
   std::filesystem::path path = winpath(abspath(in));
   std::string path_lower = path;
   path_lower = lower(path_lower);
+
+  // TODO: Handle Intent_Delete
 
   {
     std::lock_guard<std::mutex> lock(read_mappings_mutex);
@@ -176,10 +186,16 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
 
     for (auto it = write_mappings.begin(); it != write_mappings.end(); it++) {
       if (!strncmp(path_lower.c_str(), it->first.c_str(), it->first.size())) {
-        return std::filesystem::path(it->second) / std::filesystem::path(path_lower.c_str() + it->first.size());
+        std::filesystem::path newpath = std::filesystem::path(it->second) / std::filesystem::path(path_lower.c_str() + it->first.size());
+        write_mappings[path_lower] = newpath;
+        return newpath;
       }
     }
   }
 
   return path;
+}
+
+const char* winevfs_get_path(const char* in, Intent intent) {
+  return winevfs_get_path(std::filesystem::path(in), intent).c_str();
 }
