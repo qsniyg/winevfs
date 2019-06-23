@@ -155,6 +155,7 @@ static std::filesystem::path winpath(std::filesystem::path source) {
       while ((entry = readdir(d)) != NULL) {
         std::string filename = entry->d_name;
         if (lower(filename) == basename_lower) {
+          closedir(d);
           return winparent / filename;
         }
       }
@@ -197,5 +198,8 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
 }
 
 const char* winevfs_get_path(const char* in, Intent intent) {
-  return winevfs_get_path(std::filesystem::path(in), intent).c_str();
+  std::string retval = winevfs_get_path(std::filesystem::path(in), intent);
+  char* ret = (char*)malloc(retval.size() + 1);
+  strcpy(ret, retval.c_str());
+  return ret;
 }

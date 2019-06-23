@@ -4,7 +4,7 @@
 extern "C" {
 extern void* dlsym (void* handle, const char* name);
 
-int winevfs__open(const char* pathname, int flags, ...) {
+extern void free(void *ptr);extern int puts(const char *s);int winevfs__open(const char* pathname, int flags, ...) {
     static int (*original)(const char*, int, ...) = (int (*)(const char*, int, ...))dlsym(RTLD_NEXT, "open");
     return original(pathname, flags);
 }
@@ -87,7 +87,9 @@ int open(const char* pathname, int flags, ...) {
         pathname_intent = Intent_Create;
     }
     pathname = winevfs_get_path(pathname, pathname_intent);
-    return winevfs__open(pathname, flags);
+    int ret = winevfs__open(pathname, flags);
+    free((void*)pathname);
+    return ret;
 }
 
 int fopen(const char* pathname, const char* mode) {
@@ -96,38 +98,50 @@ int fopen(const char* pathname, const char* mode) {
         pathname_intent = Intent_Create;
     }
     pathname = winevfs_get_path(pathname, pathname_intent);
-    return winevfs__fopen(pathname, mode);
+    int ret = winevfs__fopen(pathname, mode);
+    free((void*)pathname);
+    return ret;
 }
 
 int __xstat(int ver, const char* path, struct stat* buf) {
     Intent path_intent = Intent_Read;
     path = winevfs_get_path(path, path_intent);
-    return winevfs____xstat(ver, path, buf);
+    int ret = winevfs____xstat(ver, path, buf);
+    free((void*)path);
+    return ret;
 }
 
 int __lxstat(int ver, const char* path, struct stat* buf) {
     Intent path_intent = Intent_Read;
     path = winevfs_get_path(path, path_intent);
-    return winevfs____lxstat(ver, path, buf);
+    int ret = winevfs____lxstat(ver, path, buf);
+    free((void*)path);
+    return ret;
 }
 
 int __fxstatat(int ver, int dirfd, const char* path, struct stat* statbuf, int flags) {
     Intent path_intent = Intent_Read;
     path = winevfs_get_path(path, path_intent);
-    return winevfs____fxstatat(ver, dirfd, path, statbuf, flags);
+    int ret = winevfs____fxstatat(ver, dirfd, path, statbuf, flags);
+    free((void*)path);
+    return ret;
 }
 
 int faccessat(int dirfd, const char* file, int mode, int flags) {
     Intent file_intent = Intent_Read;
     file = winevfs_get_path(file, file_intent);
-    return winevfs__faccessat(dirfd, file, mode, flags);
+    int ret = winevfs__faccessat(dirfd, file, mode, flags);
+    free((void*)file);
+    return ret;
 }
 
 int unlink(const char* path) {
     Intent path_intent = Intent_Read;
     path_intent = Intent_Delete;
     path = winevfs_get_path(path, path_intent);
-    return winevfs__unlink(path);
+    int ret = winevfs__unlink(path);
+    free((void*)path);
+    return ret;
 }
 
 int rename(const char* old, const char* newpath) {
@@ -137,7 +151,10 @@ int rename(const char* old, const char* newpath) {
     Intent newpath_intent = Intent_Read;
     newpath_intent = Intent_Create;
     newpath = winevfs_get_path(newpath, newpath_intent);
-    return winevfs__rename(old, newpath);
+    int ret = winevfs__rename(old, newpath);
+    free((void*)old);
+    free((void*)newpath);
+    return ret;
 }
 
 int renameat(int oldfd, const char* old, int newfd, const char* newpath) {
@@ -147,7 +164,10 @@ int renameat(int oldfd, const char* old, int newfd, const char* newpath) {
     Intent newpath_intent = Intent_Read;
     newpath_intent = Intent_Create;
     newpath = winevfs_get_path(newpath, newpath_intent);
-    return winevfs__renameat(oldfd, old, newfd, newpath);
+    int ret = winevfs__renameat(oldfd, old, newfd, newpath);
+    free((void*)old);
+    free((void*)newpath);
+    return ret;
 }
 
 int renameatu(int fd1, const char* src, int fd2, const char* dst, unsigned int flags) {
@@ -155,7 +175,10 @@ int renameatu(int fd1, const char* src, int fd2, const char* dst, unsigned int f
     src = winevfs_get_path(src, src_intent);
     Intent dst_intent = Intent_Read;
     dst = winevfs_get_path(dst, dst_intent);
-    return winevfs__renameatu(fd1, src, fd2, dst, flags);
+    int ret = winevfs__renameatu(fd1, src, fd2, dst, flags);
+    free((void*)src);
+    free((void*)dst);
+    return ret;
 }
 
 int linkat(int fromfd, const char* from, int tofd, const char* to, int flags) {
@@ -164,7 +187,10 @@ int linkat(int fromfd, const char* from, int tofd, const char* to, int flags) {
     Intent to_intent = Intent_Read;
     to_intent = Intent_Create;
     to = winevfs_get_path(to, to_intent);
-    return winevfs__linkat(fromfd, from, tofd, to, flags);
+    int ret = winevfs__linkat(fromfd, from, tofd, to, flags);
+    free((void*)from);
+    free((void*)to);
+    return ret;
 }
 
 int symlinkat(const char* from, int fd, const char* to) {
@@ -173,25 +199,34 @@ int symlinkat(const char* from, int fd, const char* to) {
     Intent to_intent = Intent_Read;
     to_intent = Intent_Create;
     to = winevfs_get_path(to, to_intent);
-    return winevfs__symlinkat(from, fd, to);
+    int ret = winevfs__symlinkat(from, fd, to);
+    free((void*)from);
+    free((void*)to);
+    return ret;
 }
 
 int mkdir(const char* path, unsigned int mode) {
     Intent path_intent = Intent_Read;
     path = winevfs_get_path(path, path_intent);
-    return winevfs__mkdir(path, mode);
+    int ret = winevfs__mkdir(path, mode);
+    free((void*)path);
+    return ret;
 }
 
 void* dlopen(const char* filename, int flags) {
     Intent filename_intent = Intent_Read;
     filename = winevfs_get_path(filename, filename_intent);
-    return winevfs__dlopen(filename, flags);
+    void* ret = winevfs__dlopen(filename, flags);
+    free((void*)filename);
+    return ret;
 }
 
 void* opendir(const char* name) {
     Intent name_intent = Intent_Read;
     name = winevfs_get_path(name, name_intent);
-    return winevfs__opendir(name);
+    void* ret = winevfs__opendir(name);
+    free((void*)name);
+    return ret;
 }
 
 }

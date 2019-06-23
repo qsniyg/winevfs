@@ -189,6 +189,8 @@ retstr += "#define O_CREAT 0x0100\n";
 
 retstr += 'extern "C" {\n';
 retstr += "extern void* dlsym (void* handle, const char* name);\n\n";
+retstr += "extern void free(void *ptr);";
+retstr += "extern int puts(const char *s);";
 
 functions.forEach(fn => {
   retstr += fnheader(fn, "winevfs__" + fn.name) + " {\n";
@@ -201,6 +203,7 @@ retstr += "\n\n";
 
 functions.forEach(fn => {
   retstr += fnheader(fn) + " {\n";
+  //retstr += "    puts(\"" + fn.name + "\");\n";
   fn.args.forEach(arg => {
     if (arg.length === 3) {
       var iname = arg[1] + "_intent";
@@ -220,10 +223,21 @@ functions.forEach(fn => {
       }
 
       retstr += "    " + arg[1] + " = winevfs_get_path(" + arg[1] + ", " + iname + ");\n";
+
+      //retstr += "    puts(" + arg[1] + ");\n";
     }
   });
 
-  retstr += "    return winevfs__" + fn.name + "(" + varnames(fn) + ");\n";
+  retstr += "    " + fn.ret + " ret = winevfs__" + fn.name + "(" + varnames(fn) + ");\n";
+
+  fn.args.forEach(arg => {
+    if (arg.length === 3) {
+      retstr += "    free((void*)" + arg[1] + ");\n";
+    }
+  });
+
+  retstr += "    return ret;\n";
+
   retstr += "}\n\n";
 });
 
