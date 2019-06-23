@@ -9,8 +9,13 @@ extern void free(void *ptr);extern int puts(const char *s);int winevfs__open(con
     return original(pathname, flags);
 }
 
-int winevfs__fopen(const char* pathname, const char* mode) {
-    static int (*original)(const char*, const char*) = (int (*)(const char*, const char*))dlsym(RTLD_NEXT, "fopen");
+int winevfs__openat(int dirfd, const char* pathname, int flags, ...) {
+    static int (*original)(int, const char*, int, ...) = (int (*)(int, const char*, int, ...))dlsym(RTLD_NEXT, "openat");
+    return original(dirfd, pathname, flags);
+}
+
+void* winevfs__fopen(const char* pathname, const char* mode) {
+    static void* (*original)(const char*, const char*) = (void* (*)(const char*, const char*))dlsym(RTLD_NEXT, "fopen");
     return original(pathname, mode);
 }
 
@@ -87,13 +92,24 @@ int open(const char* pathname, int flags, ...) {
     return ret;
 }
 
-int fopen(const char* pathname, const char* mode) {
+int openat(int dirfd, const char* pathname, int flags, ...) {
+    Intent pathname_intent = Intent_Read;
+    if (flags & O_CREAT) {
+        pathname_intent = Intent_Create;
+    }
+    pathname = winevfs_get_path(pathname, pathname_intent);
+    int ret = winevfs__openat(dirfd, pathname, flags);
+    free((void*)pathname);
+    return ret;
+}
+
+void* fopen(const char* pathname, const char* mode) {
     Intent pathname_intent = Intent_Read;
     if (mode && mode[0] == 'w') {
         pathname_intent = Intent_Create;
     }
     pathname = winevfs_get_path(pathname, pathname_intent);
-    int ret = winevfs__fopen(pathname, mode);
+    void* ret = winevfs__fopen(pathname, mode);
     free((void*)pathname);
     return ret;
 }

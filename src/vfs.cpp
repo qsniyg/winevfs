@@ -179,6 +179,7 @@ static std::filesystem::path winpath(std::filesystem::path source) {
 }
 
 std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
+  //std::cout << in << std::endl;
   std::filesystem::path path = winpath(abspath(in));
   //std::cout << path << std::endl;
   std::string path_lower = path;
@@ -213,7 +214,13 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
 
 const char* winevfs_get_path(const char* in, Intent intent) {
   std::string retval = winevfs_get_path(std::filesystem::path(in), intent);
-  char* ret = (char*)malloc(retval.size() + 1);
-  strcpy(ret, retval.c_str());
+  char* ret;
+  if (true) {
+    ret = (char*)malloc(retval.size() + 1);
+    strcpy(ret, retval.c_str());
+  } else {
+    ret = (char*)malloc(strlen(in) + 1);
+    strcpy(ret, in);
+  }
   return ret;
 }

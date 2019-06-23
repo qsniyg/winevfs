@@ -12,6 +12,16 @@ var _functions = [
   },
   {
     ret: "int",
+    name: "openat",
+    args: [
+      ["int", "dirfd"],
+      ["const char*", "pathname", "open_intent"],
+      ["int", "flags"],
+      ["..."]
+    ]
+  },
+  {
+    ret: "void*",
     name: "fopen",
     args: [
       ["const char*", "pathname", "fopen_intent"],
@@ -200,6 +210,7 @@ retstr += 'extern "C" {\n';
 retstr += "extern void* dlsym (void* handle, const char* name);\n\n";
 retstr += "extern void free(void *ptr);";
 retstr += "extern int puts(const char *s);";
+
 
 functions.forEach(fn => {
   retstr += fnheader(fn, "winevfs__" + fn.name) + " {\n";

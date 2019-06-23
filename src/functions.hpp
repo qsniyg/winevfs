@@ -1,6 +1,7 @@
 extern "C" {
 int winevfs__open(const char* pathname, int flags, ...);
-int winevfs__fopen(const char* pathname, const char* mode);
+int winevfs__openat(int dirfd, const char* pathname, int flags, ...);
+void* winevfs__fopen(const char* pathname, const char* mode);
 int winevfs____xstat(int ver, const char* path, struct stat* buf);
 int winevfs____lxstat(int ver, const char* path, struct stat* buf);
 int winevfs____fxstatat(int ver, int dirfd, const char* path, struct stat* statbuf, int flags);
