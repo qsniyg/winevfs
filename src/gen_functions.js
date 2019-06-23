@@ -1,6 +1,6 @@
 var fs = require("fs");
 
-var functions = [
+var _functions = [
   {
     ret: "int",
     name: "open",
@@ -126,6 +126,7 @@ var functions = [
   {
     ret: "void*",
     name: "dlopen",
+    disabled: true, // TODO: fix relative paths
     args: [
       ["const char*", "filename", "r"],
       ["int", "flags"]
@@ -139,6 +140,14 @@ var functions = [
     ]
   }
 ];
+
+var functions = [];
+_functions.forEach(fn => {
+  if (fn.disabled)
+    return;
+
+  functions.push(fn);
+});
 
 function fnheader(fn, fnname) {
   var ret = fn.ret;

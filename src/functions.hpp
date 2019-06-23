@@ -12,6 +12,5 @@ int winevfs__renameatu(int fd1, const char* src, int fd2, const char* dst, unsig
 int winevfs__linkat(int fromfd, const char* from, int tofd, const char* to, int flags);
 int winevfs__symlinkat(const char* from, int fd, const char* to);
 int winevfs__mkdir(const char* path, unsigned int mode);
-void* winevfs__dlopen(const char* filename, int flags);
 void* winevfs__opendir(const char* name);
 }

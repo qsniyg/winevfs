@@ -69,11 +69,6 @@ int winevfs__mkdir(const char* path, unsigned int mode) {
     return original(path, mode);
 }
 
-void* winevfs__dlopen(const char* filename, int flags) {
-    static void* (*original)(const char*, int) = (void* (*)(const char*, int))dlsym(RTLD_NEXT, "dlopen");
-    return original(filename, flags);
-}
-
 void* winevfs__opendir(const char* name) {
     static void* (*original)(const char*) = (void* (*)(const char*))dlsym(RTLD_NEXT, "opendir");
     return original(name);
@@ -210,14 +205,6 @@ int mkdir(const char* path, unsigned int mode) {
     path = winevfs_get_path(path, path_intent);
     int ret = winevfs__mkdir(path, mode);
     free((void*)path);
-    return ret;
-}
-
-void* dlopen(const char* filename, int flags) {
-    Intent filename_intent = Intent_Read;
-    filename = winevfs_get_path(filename, filename_intent);
-    void* ret = winevfs__dlopen(filename, flags);
-    free((void*)filename);
     return ret;
 }
 

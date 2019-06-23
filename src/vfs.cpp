@@ -34,7 +34,8 @@ static bool fs_exists(std::filesystem::path source) {
 
 static bool fs_isdir(std::filesystem::path source) {
   struct stat s;
-  fs_stat(source, &s);
+  if (fs_stat(source, &s))
+    return false;
 
   return S_ISDIR(s.st_mode);
 }
@@ -58,8 +59,10 @@ static std::filesystem::path abspath_simple(std::filesystem::path source) {
     if (*it == ".")
       continue;
     if (*it == "..") {
-      new_path = new_path.parent_path();
-      continue;
+      if (new_path.has_parent_path()) {
+        new_path = new_path.parent_path();
+        continue;
+      }
     }
 
     new_path /= *it;
@@ -69,10 +72,11 @@ static std::filesystem::path abspath_simple(std::filesystem::path source) {
 }
 
 static std::filesystem::path abspath(std::filesystem::path source) {
-  if (source.is_absolute())
-    return source;
-
   std::filesystem::path path = abspath_simple(source);
+
+  if (path.is_absolute())
+    return path;
+
   // TODO: maybe cache?
   path = fs_getcwd() / path;
   return abspath_simple(path);
@@ -117,6 +121,7 @@ void winevfs_add_write_directory(std::filesystem::path source, std::filesystem::
 }
 
 std::unordered_map<std::string, std::filesystem::path> path_cache;
+std::mutex path_cache_mutex;
 static std::filesystem::path winpath(std::filesystem::path source) {
   if (fs_exists(source)) {
     return source;
@@ -127,9 +132,12 @@ static std::filesystem::path winpath(std::filesystem::path source) {
   std::string path_str = source;
   path_str = lower(path_str);
 
-  auto it = path_cache.find(path_str);
-  if (it != path_cache.end())
-    return it->second;
+  {
+    std::lock_guard<std::mutex> lock(path_cache_mutex);
+    auto it = path_cache.find(path_str);
+    if (it != path_cache.end())
+      return it->second;
+  }
 
   if (!source.has_parent_path())
     return source;
@@ -143,9 +151,12 @@ static std::filesystem::path winpath(std::filesystem::path source) {
   std::string winparent_lower = winparent;
   winparent_lower = lower(winparent_lower);
 
-  it = path_cache.find(winparent_lower);
-  if (it == path_cache.end())
-    path_cache[winparent_lower] = winparent;
+  {
+    std::lock_guard<std::mutex> lock(path_cache_mutex);
+    auto it = path_cache.find(winparent_lower);
+    if (it == path_cache.end())
+      path_cache[winparent_lower] = winparent;
+  }
 
   if (fs_isdir(winparent)) {
     DIR* d = fs_opendir(winparent);
@@ -169,6 +180,7 @@ static std::filesystem::path winpath(std::filesystem::path source) {
 
 std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
   std::filesystem::path path = winpath(abspath(in));
+  //std::cout << path << std::endl;
   std::string path_lower = path;
   path_lower = lower(path_lower);
 
@@ -183,15 +195,17 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
   };
 
   if (intent == Intent_Modify || intent == Intent_Create) {
-    std::lock_guard<std::mutex> lock(write_mappings_mutex);
+    {
+      std::lock_guard<std::mutex> lock(write_mappings_mutex);
 
-    for (auto it = write_mappings.begin(); it != write_mappings.end(); it++) {
-      if (!strncmp(path_lower.c_str(), it->first.c_str(), it->first.size())) {
-        std::filesystem::path newpath = std::filesystem::path(it->second) / std::filesystem::path(path_lower.c_str() + it->first.size());
-        write_mappings[path_lower] = newpath;
-        return newpath;
+      for (auto it = write_mappings.begin(); it != write_mappings.end(); it++) {
+        if (!strncmp(path_lower.c_str(), it->first.c_str(), it->first.size())) {
+          std::filesystem::path newpath = std::filesystem::path(it->second) / std::filesystem::path(path_lower.c_str() + it->first.size());
+          write_mappings[path_lower] = newpath;
+          return newpath;
+        }
       }
-    }
+    };
   }
 
   return path;
