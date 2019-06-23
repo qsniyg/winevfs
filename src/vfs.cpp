@@ -45,6 +45,19 @@ static DIR* fs_opendir(std::filesystem::path source) {
   return (DIR*)winevfs__opendir(path_str.c_str());
 }
 
+void fs_mkdir_p(std::filesystem::path source) {
+  if (!source.has_parent_path()) {
+    return;
+  }
+
+  if (!fs_isdir(source)) {
+    std::filesystem::path parent = source.parent_path();
+    fs_mkdir_p(parent);
+
+    winevfs__mkdir(std::string(source).c_str(), 0777);
+  }
+}
+
 std::filesystem::path fs_getcwd() {
   char path[PATH_MAX];
   getcwd(path, PATH_MAX);
@@ -313,11 +326,12 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
 
       for (auto it = write_mappings.begin(); it != write_mappings.end(); it++) {
         if (!strncmp(path_lower.c_str(), it->first.c_str(), it->first.size())) {
-          const char* rest = path_lower.c_str() + it->first.size();
+          const char* rest = path.c_str() + it->first.size();
           if (rest[0] == '/')
             rest++;
 
           std::filesystem::path newpath = std::filesystem::path(it->second) / std::filesystem::path(rest);
+          fs_mkdir_p(newpath.parent_path());
 
           std::lock_guard<std::mutex> read_lock(read_mappings_mutex);
           read_mappings[path_lower] = newpath;
