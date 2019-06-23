@@ -84,36 +84,61 @@ static std::filesystem::path abspath(std::filesystem::path source) {
 }
 
 // TODO: somehow make this work better multi-process
-std::unordered_map<std::string, std::string> read_mappings;
-std::mutex read_mappings_mutex;
-std::unordered_map<std::string, std::string> write_mappings;
-std::mutex write_mappings_mutex;
+static std::unordered_map<std::string, std::string> read_mappings;
+static std::mutex read_mappings_mutex;
+static std::unordered_map<std::string, std::string> write_mappings;
+static std::mutex write_mappings_mutex;
 //std::unordered_map<std::string, std::string> unlink_mappings; // TODO
+static bool inited = false;
+static std::mutex inited_mutex;
+
+void _add_read_entry(std::string source, std::string destination) {
+  std::lock_guard<std::mutex> lock(read_mappings_mutex);
+  read_mappings[lower(source)] = destination;
+  //std::cout << source << std::endl;
+  //std::cout << destination << std::endl;
+}
 
 void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::path destination) {
   source = abspath(source);
   destination = abspath(destination);
 
-  for (const auto& entry : std::filesystem::directory_iterator(source)) {
-    std::string out = destination / entry.path().filename();
-    std::string path = entry.path();
+  if (fs_isdir(destination)) {
+    DIR* d = fs_opendir(destination);
 
-    if (entry.is_directory()) {
-      winevfs_add_read_directory(path, out);
-    } else {
-      std::lock_guard<std::mutex> lock(read_mappings_mutex);
-      read_mappings[lower(path)] = out;
+    if (d) {
+      struct dirent* entry;
+      while ((entry = readdir(d)) != NULL) {
+        if (entry->d_name[0] == '.') {
+          if (entry->d_name[1] == 0)
+            continue;
+
+          if (entry->d_name[1] == '.' && entry->d_name[2] == 0)
+            continue;
+        }
+
+        std::string out = destination / entry->d_name;
+        std::string path = source / entry->d_name;
+
+        if (fs_isdir(out)) {
+          winevfs_add_read_directory(path, out);
+        } else {
+          _add_read_entry(path, out);
+        }
+      }
+
+      return;
     }
   }
+
+  _add_read_entry(source, destination);
 }
 
 void winevfs_add_read_file(std::filesystem::path source, std::filesystem::path destination) {
   source = abspath(source);
   destination = abspath(destination);
-  std::string source_string = source;
 
-  std::lock_guard<std::mutex> lock(read_mappings_mutex);
-  read_mappings[lower(source_string)] = destination;
+  _add_read_entry(source, destination);
 }
 
 void winevfs_add_write_directory(std::filesystem::path source, std::filesystem::path destination) {
@@ -125,8 +150,8 @@ void winevfs_add_write_directory(std::filesystem::path source, std::filesystem::
   write_mappings[lower(source_string)] = destination;
 }
 
-std::unordered_map<std::string, std::filesystem::path> path_cache;
-std::mutex path_cache_mutex;
+static std::unordered_map<std::string, std::filesystem::path> path_cache;
+static std::mutex path_cache_mutex;
 static std::filesystem::path winpath(std::filesystem::path source) {
   if (fs_exists(source)) {
     return source;
@@ -183,7 +208,89 @@ static std::filesystem::path winpath(std::filesystem::path source) {
   return winparent / basename;
 }
 
+void winevfs_read_vfsfile(char* envfile) {
+  FILE* fp = (FILE*)winevfs__fopen(envfile, "r");
+
+  ssize_t read;
+  size_t len = 0;
+  char* line = NULL;
+
+  bool quick = false;
+  bool first = true;
+
+  int phase = 0;
+  bool is_read = false;
+  std::string input = "";
+  std::string output = "";
+
+  while ((read = getline(&line, &len, fp)) != -1) {
+    // Remove trailing \n
+    line[strlen(line) - 1] = 0;
+
+    if (first) {
+      first = false;
+
+      if (!strcmp(line, "quick")) {
+        quick = true;
+        continue;
+      }
+    }
+
+    if (phase == 0) {
+      if (line[0] == 'R') {
+        is_read = true;
+      } else if (line[0] == 'W') {
+        is_read = false;
+      }
+
+      phase = 1;
+      continue;
+    }
+
+    if (phase == 1) {
+      input = line;
+
+      phase = 2;
+      continue;
+    }
+
+    if (phase == 2) {
+      output = line;
+
+      if (is_read) {
+        if (quick) {
+          winevfs_add_read_file(input, output);
+        } else {
+          winevfs_add_read_directory(input, output);
+        }
+      } else {
+        winevfs_add_write_directory(input, output);
+      }
+
+      phase = 0;
+      continue;
+    }
+  }
+
+  fclose(fp);
+}
+
+void winevfs_init() {
+  std::lock_guard<std::mutex> lock(inited_mutex);
+  if (inited)
+    return;
+
+  char* envfile = getenv("WINEVFS_VFSFILE");
+  if (!envfile || !envfile[0])
+    return;
+
+  winevfs_read_vfsfile(envfile);
+  inited = true;
+}
+
 std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
+  winevfs_init();
+
   //std::cout << in << std::endl;
   std::filesystem::path path = winpath(abspath(in));
   //std::cout << path << std::endl;
