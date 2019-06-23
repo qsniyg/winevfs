@@ -12,6 +12,7 @@
 #include <iostream>
 #include "functions.hpp"
 
+// TODO: improve
 static std::string lower(std::string& in) {
   std::string out = in;
   std::transform(out.begin(), out.end(), out.begin(), ::tolower);
@@ -84,7 +85,7 @@ static std::filesystem::path abspath_simple(std::filesystem::path source) {
   return new_path;
 }
 
-static std::filesystem::path abspath(std::filesystem::path source) {
+std::filesystem::path winevfs_abspath(std::filesystem::path source) {
   std::filesystem::path path = abspath_simple(source);
 
   if (path.is_absolute())
@@ -113,8 +114,8 @@ void _add_read_entry(std::string source, std::string destination) {
 }
 
 void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::path destination) {
-  source = abspath(source);
-  destination = abspath(destination);
+  source = winevfs_abspath(source);
+  destination = winevfs_abspath(destination);
 
   if (fs_isdir(destination)) {
     DIR* d = fs_opendir(destination);
@@ -148,15 +149,15 @@ void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::p
 }
 
 void winevfs_add_read_file(std::filesystem::path source, std::filesystem::path destination) {
-  source = abspath(source);
-  destination = abspath(destination);
+  source = winevfs_abspath(source);
+  destination = winevfs_abspath(destination);
 
   _add_read_entry(source, destination);
 }
 
 void winevfs_add_write_directory(std::filesystem::path source, std::filesystem::path destination) {
-  source = abspath(source);
-  destination = abspath(destination);
+  source = winevfs_abspath(source);
+  destination = winevfs_abspath(destination);
   std::string source_string = source;
 
   std::lock_guard<std::mutex> lock(write_mappings_mutex);
@@ -170,7 +171,7 @@ static std::filesystem::path winpath(std::filesystem::path source) {
     return source;
   }
 
-  source = abspath(source);
+  source = winevfs_abspath(source);
 
   std::string path_str = source;
   path_str = lower(path_str);
@@ -288,6 +289,34 @@ void winevfs_read_vfsfile(char* envfile) {
   fclose(fp);
 }
 
+void winevfs_write_vfsfile(char* envfile) {
+  FILE* fp = (FILE*)winevfs__fopen(envfile, "w");
+
+  fputs("quick\n", fp);
+
+  for (auto it = read_mappings.begin(); it != read_mappings.end(); it++) {
+    fputs("R\n", fp);
+
+    fputs(it->first.c_str(), fp);
+    fputc('\n', fp);
+
+    fputs(it->second.c_str(), fp);
+    fputc('\n', fp);
+  }
+
+  for (auto it = write_mappings.begin(); it != write_mappings.end(); it++) {
+    fputs("W\n", fp);
+
+    fputs(it->first.c_str(), fp);
+    fputc('\n', fp);
+
+    fputs(it->second.c_str(), fp);
+    fputc('\n', fp);
+  }
+
+  fclose(fp);
+}
+
 void winevfs_init() {
   std::lock_guard<std::mutex> lock(inited_mutex);
   if (inited)
@@ -305,7 +334,7 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
   winevfs_init();
 
   //std::cout << in << std::endl;
-  std::filesystem::path path = winpath(abspath(in));
+  std::filesystem::path path = winpath(winevfs_abspath(in));
   //std::cout << path << std::endl;
   std::string path_lower = path;
   path_lower = lower(path_lower);

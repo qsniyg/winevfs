@@ -21,3 +21,4 @@ set(SOURCES
 
 add_executable(winevfs ${SOURCES})
 target_link_libraries(winevfs stdc++fs dl)
+set_target_properties(winevfs PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
