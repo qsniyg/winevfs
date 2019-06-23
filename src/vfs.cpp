@@ -101,6 +101,7 @@ void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::p
     if (entry.is_directory()) {
       winevfs_add_read_directory(path, out);
     } else {
+      std::lock_guard<std::mutex> lock(read_mappings_mutex);
       read_mappings[lower(path)] = out;
     }
   }
@@ -110,6 +111,8 @@ void winevfs_add_read_file(std::filesystem::path source, std::filesystem::path d
   source = abspath(source);
   destination = abspath(destination);
   std::string source_string = source;
+
+  std::lock_guard<std::mutex> lock(read_mappings_mutex);
   read_mappings[lower(source_string)] = destination;
 }
 
@@ -117,6 +120,8 @@ void winevfs_add_write_directory(std::filesystem::path source, std::filesystem::
   source = abspath(source);
   destination = abspath(destination);
   std::string source_string = source;
+
+  std::lock_guard<std::mutex> lock(write_mappings_mutex);
   write_mappings[lower(source_string)] = destination;
 }
 
@@ -202,7 +207,9 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
       for (auto it = write_mappings.begin(); it != write_mappings.end(); it++) {
         if (!strncmp(path_lower.c_str(), it->first.c_str(), it->first.size())) {
           std::filesystem::path newpath = std::filesystem::path(it->second) / std::filesystem::path(path_lower.c_str() + it->first.size());
-          write_mappings[path_lower] = newpath;
+
+          std::lock_guard<std::mutex> read_lock(read_mappings_mutex);
+          read_mappings[path_lower] = newpath;
           return newpath;
         }
       }
