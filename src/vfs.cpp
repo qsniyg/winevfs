@@ -540,7 +540,7 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent, int atfd) 
             rest++;
 
           std::filesystem::path newpath = std::filesystem::path(it->second) / std::filesystem::path(rest);
-          //fs_mkdir_p(newpath.parent_path());
+          fs_mkdir_p(newpath.parent_path());
 
           _add_read_entry(path, newpath);
           //std::lock_guard<std::mutex> read_lock(read_mappings_mutex);
