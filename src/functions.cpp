@@ -5,7 +5,7 @@
 extern "C" {
 extern void* dlsym (void* handle, const char* name);
 
-extern void free(void *ptr);extern int puts(const char *s);extern void winevfs_add_opendir(void* dir, int atfd, const char* path);extern void winevfs_add_opendir64(void* dir, int atfd, const char* path);extern void fflush(void* stream);extern void* stdout;int winevfs__open(const char* pathname, int flags, mode_t mode) {
+extern void free(void *ptr);extern int puts(const char *s);extern void winevfs_add_opendir(void* dir, const char* path, int atfd);extern void winevfs_add_opendir64(void* dir, const char* path, int atfd);extern void fflush(void* stream);extern void* stdout;int winevfs__open(const char* pathname, int flags, mode_t mode) {
     static int (*original)(const char*, int, ...) = (int (*)(const char*, int, ...))dlsym(RTLD_NEXT, "open");
     return original(pathname, flags, mode);
 }
@@ -665,7 +665,7 @@ void* opendir(const char* name) {
     name = winevfs_get_path(name, name_intent, AT_FDCWD);
     void* ret = winevfs__opendir(name);
     free((void*)name);
-    winevfs_add_opendir(ret, AT_FDCWD, orig_name);
+    winevfs_add_opendir(ret, orig_name, AT_FDCWD);
     return ret;
 }
 
@@ -675,7 +675,7 @@ void* opendir64(const char* name) {
     name = winevfs_get_path(name, name_intent, AT_FDCWD);
     void* ret = winevfs__opendir64(name);
     free((void*)name);
-    winevfs_add_opendir64(ret, AT_FDCWD, orig_name);
+    winevfs_add_opendir64(ret, orig_name, AT_FDCWD);
     return ret;
 }
 

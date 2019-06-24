@@ -429,8 +429,8 @@ retstr += 'extern "C" {\n';
 retstr += "extern void* dlsym (void* handle, const char* name);\n\n";
 retstr += "extern void free(void *ptr);";
 retstr += "extern int puts(const char *s);";
-retstr += "extern void winevfs_add_opendir(void* dir, int atfd, const char* path);";
-retstr += "extern void winevfs_add_opendir64(void* dir, int atfd, const char* path);";
+retstr += "extern void winevfs_add_opendir(void* dir, const char* path, int atfd);";
+retstr += "extern void winevfs_add_opendir64(void* dir, const char* path, int atfd);";
 retstr += "extern void fflush(void* stream);";
 retstr += "extern void* stdout;";
 
@@ -500,7 +500,7 @@ functions.forEach(fn => {
   });
 
   if (fn.is_opendir) {
-    retstr += "    winevfs_add_" + fn.name + "(ret, AT_FDCWD, orig_name);\n";
+    retstr += "    winevfs_add_" + fn.name + "(ret, orig_name, AT_FDCWD);\n";
   }
 
   retstr += "    return ret;\n";

@@ -202,7 +202,7 @@ std::filesystem::path winevfs_abspath(std::filesystem::path source, int atfd) {
 }
 
 std::string winevfs_abspath(std::string source, int atfd) {
-  return std::string(winevfs_abspath(std::filesystem::path(source)), atfd);
+  return std::string(winevfs_abspath(std::filesystem::path(source), atfd));
 }
 
 void unique_vector::insert(std::string string) {
@@ -504,7 +504,7 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent, int atfd) 
   //std::cout << path << std::endl;
   std::string path_lower = lower(path_str);
 
-  //std::cout << "LOWER: " << path_lower << std::endl;
+  //std::cout << "LOWER: " << path_lower << std::endl;fflush(stdout);
 
   // TODO: Handle Intent_Delete
 
@@ -521,7 +521,7 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent, int atfd) 
     auto it = winevfs_folder_mappings.find(path_lower);
     if (it != winevfs_folder_mappings.end()) {
       std::string win_path = winpath(path, atfd);
-      //std::cout << "WINP: " << win_path << std::endl;
+      //std::cout << "WINP: " << win_path << std::endl;fflush(stdout);
       if (!fs_isdir(win_path))
         return "/tmp/.winevfs_fakedir/";
       else
