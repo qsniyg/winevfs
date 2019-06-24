@@ -1,4 +1,5 @@
 #include "vfs_minimal.hpp"
+#include <sys/types.h>
 #define RTLD_NEXT ((void*) -1l)
 #define O_CREAT 0x0100
 extern "C" {
@@ -194,8 +195,8 @@ int winevfs__utimensat(int dirfd, const char* pathname, const struct timespec* t
     return original(dirfd, pathname, times, flags);
 }
 
-int winevfs__readlink(const char* path, char* buf, int bufsiz) {
-    static int (*original)(const char*, char*, int) = (int (*)(const char*, char*, int))dlsym(RTLD_NEXT, "readlink");
+ssize_t winevfs__readlink(const char* path, char* buf, size_t bufsiz) {
+    static ssize_t (*original)(const char*, char*, size_t) = (ssize_t (*)(const char*, char*, size_t))dlsym(RTLD_NEXT, "readlink");
     return original(path, buf, bufsiz);
 }
 
@@ -572,10 +573,10 @@ int utimensat(int dirfd, const char* pathname, const struct timespec* times, int
     return ret;
 }
 
-int readlink(const char* path, char* buf, int bufsiz) {
+ssize_t readlink(const char* path, char* buf, size_t bufsiz) {
     Intent path_intent = Intent_Read;
     path = winevfs_get_path(path, path_intent);
-    int ret = winevfs__readlink(path, buf, bufsiz);
+    ssize_t ret = winevfs__readlink(path, buf, bufsiz);
     free((void*)path);
     return ret;
 }

@@ -70,7 +70,7 @@ void fs_mkdir_p(std::filesystem::path source) {
 
 std::filesystem::path fs_getcwd() {
   char path[PATH_MAX];
-  getcwd(path, PATH_MAX);
+  getcwd(path, PATH_MAX - 1);
 
   return std::filesystem::path(path);
 }
@@ -94,16 +94,86 @@ static std::filesystem::path abspath_simple(std::filesystem::path source) {
   return new_path;
 }
 
-std::filesystem::path winevfs_abspath(std::filesystem::path source) {
+static std::unordered_map<std::string, std::string> readlink_cache;
+static std::mutex readlink_cache_mutex;
+
+std::filesystem::path full_abspath(std::filesystem::path source) {
   std::filesystem::path path = abspath_simple(source);
 
   if (path.is_absolute())
     return path;
 
-  // TODO: maybe cache?
-  // TODO: resolve links (dosdevices/c: -> drive_c)
   path = fs_getcwd() / path;
   return abspath_simple(path);
+}
+
+static std::filesystem::path simple_readlink(std::filesystem::path source) {
+  source = abspath_simple(source);
+
+  char readlinked[PATH_MAX];
+  if (winevfs__readlink(source.c_str(), readlinked, PATH_MAX - 1) < 0) {
+    return source;
+  }
+
+  std::filesystem::path readlinked_path = readlinked;
+  if (!readlinked_path.is_absolute())
+    readlinked_path = abspath_simple(source / readlinked_path);
+
+  return readlinked_path;
+}
+
+static std::filesystem::path cached_readlink(std::filesystem::path source) {
+  source = abspath_simple(source);
+  std::string source_str = source;
+  if (!strncmp(source_str.c_str(), "/proc", sizeof("/proc") - 1)) {
+    return source;
+  }
+
+  std::string lowersource = lower(source_str);
+  {
+    std::lock_guard<std::mutex> lock(readlink_cache_mutex);
+    auto it = readlink_cache.find(lowersource);
+    if (it != readlink_cache.end())
+      return it->second;
+  }
+
+  if (has_parent_path(source)) {
+    std::filesystem::path readlinked_parent = cached_readlink(source.parent_path());
+    source = readlinked_parent / source.filename();
+    source_str = source;
+    lowersource = lower(source_str);
+  }
+
+  char readlinked[PATH_MAX];
+  readlinked[0] = 0;
+  if (winevfs__readlink(source.c_str(), readlinked, PATH_MAX - 1) <= 0) {
+    if (errno != EINVAL) // EINVAL = exists, but not a link
+      return source;
+    else
+      strcpy(readlinked, source_str.c_str());
+  }
+
+  std::filesystem::path readlinked_path = readlinked;
+  if (!readlinked_path.is_absolute())
+    readlinked_path = abspath_simple(source.parent_path() / readlinked_path);
+
+  std::lock_guard<std::mutex> lock(readlink_cache_mutex);
+  readlink_cache[lowersource] = readlinked_path;
+
+  return readlinked_path;
+}
+
+std::filesystem::path winevfs_abspath(std::filesystem::path source) {
+  std::filesystem::path path = abspath_simple(source);
+
+  /*if (path.is_absolute())
+    return path;*/
+
+  // TODO: maybe cache?
+  if (!path.is_absolute())
+    path = fs_getcwd() / path;
+  std::filesystem::path readlinked = cached_readlink(path);
+  return readlinked;
 }
 
 std::string winevfs_abspath(std::string source) {
@@ -209,8 +279,8 @@ void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::p
 }
 
 void winevfs_add_read_file(std::filesystem::path source, std::filesystem::path destination) {
-  source = winevfs_abspath(source);
-  destination = winevfs_abspath(destination);
+  //source = winevfs_abspath(source);
+  //destination = winevfs_abspath(destination);
 
   _add_read_entry(source, destination);
 }
@@ -231,7 +301,7 @@ static std::filesystem::path winpath(std::filesystem::path source) {
     return source;
   }
 
-  source = winevfs_abspath(source);
+  source = full_abspath(source);
 
   std::string path_str = source;
   path_str = lower(path_str);
@@ -389,10 +459,10 @@ void winevfs_init() {
     return;
 
   winevfs_read_vfsfile(envfile);
-  inited = true;
 
   // TODO: empty this directory
   fs_mkdir_p("/tmp/.winevfs_fakedir/");
+  inited = true;
 }
 
 std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
@@ -401,9 +471,11 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
 
   //std::cout << in << std::endl;
   std::filesystem::path path = winevfs_abspath(in);
+  std::string path_str = path;
   //std::cout << path << std::endl;
-  std::string path_lower = path;
-  path_lower = lower(path_lower);
+  std::string path_lower = lower(path_str);
+
+  //std::cout << path_lower << std::endl;
 
   // TODO: Handle Intent_Delete
 
@@ -452,7 +524,7 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
     };
   }
 
-  return winpath(path);
+  return winpath(in);
 }
 
 const char* winevfs_get_path(const char* in, Intent intent) {

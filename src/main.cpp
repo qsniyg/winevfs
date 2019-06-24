@@ -22,7 +22,10 @@ int main(int argc, char** argv) {
   setenv("WINEVFS_VFSFILE", "/tmp/.winevfs", true);
 
   char self_path[PATH_MAX];
-  winevfs__readlink("/proc/self/exe", self_path, PATH_MAX);
+  self_path[0] = 0;
+  if (winevfs__readlink("/proc/self/exe", self_path, PATH_MAX - 1) < 0) {
+    puts("Unable to find /proc/self/exe");
+  }
 
   std::filesystem::path parent_path = self_path;
   parent_path = parent_path.parent_path().parent_path() / "$LIB/libwinevfs_lib.so";
@@ -35,6 +38,8 @@ int main(int argc, char** argv) {
   char* args[argc];
   memcpy(args, argv + 1, (argc - 1) * sizeof(char*));
   args[argc - 1] = NULL;
+
+  puts("[winevfs] Running");
 
   return execvpe(args[0], args, environ);
 }

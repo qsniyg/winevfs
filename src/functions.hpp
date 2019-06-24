@@ -37,7 +37,7 @@ int winevfs__mkdir(const char* path, unsigned int mode);
 void* winevfs__opendir(const char* name);
 void* winevfs__opendir64(const char* name);
 int winevfs__utimensat(int dirfd, const char* pathname, const struct timespec* times, int flags);
-int winevfs__readlink(const char* path, char* buf, int bufsiz);
+ssize_t winevfs__readlink(const char* path, char* buf, size_t bufsiz);
 int winevfs__closedir(void* dir);
 void* winevfs__readdir(void* dir);
 void* winevfs__readdir64(void* dir);

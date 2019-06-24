@@ -195,12 +195,12 @@ var _functions = [
     ]
   },
   {
-    ret: "int",
+    ret: "ssize_t",
     name: "readlink",
     args: [
       ["const char*", "path", "r"],
       ["char*", "buf"],
-      ["int", "bufsiz"]
+      ["size_t", "bufsiz"]
     ]
   },
 
@@ -295,6 +295,7 @@ function varnames(fn) {
 var retstr = "";
 
 retstr += '#include "vfs_minimal.hpp"\n';
+retstr += "#include <sys/types.h>\n";
 retstr += "#define RTLD_NEXT ((void*) -1l)\n";
 retstr += "#define O_CREAT 0x0100\n";
 
@@ -344,6 +345,7 @@ functions.forEach(fn => {
         retstr += "    " + iname + " = Intent_Delete;\n";
       }
 
+      //retstr += "    puts(" + arg[1] + ");\n";
       retstr += "    " + arg[1] + " = winevfs_get_path(" + arg[1] + ", " + iname + ");\n";
 
       //retstr += "    puts(" + arg[1] + ");\n";
