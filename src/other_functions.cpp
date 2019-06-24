@@ -28,6 +28,7 @@ struct opendir_base_info {
   std::string path;
   bool finished;
   size_t position;
+  std::unordered_set<std::string> already;
 };
 
 struct opendir_info {
@@ -120,24 +121,37 @@ extern "C" {
   struct dirent* readdir(DIR* dirp) {
     //puts("readdir");
     struct dirent* entry = (struct dirent*)winevfs__readdir((void*)dirp);
-    if (entry != NULL) {
-      return entry;
-    }
-
-    std::string filename;
 
     std::lock_guard<std::mutex> lock(opendir_mappings_mutex);
     auto it = opendir_mappings.find(dirp);
+
+    if (entry != NULL) {
+      if (it != opendir_mappings.end()) {
+        std::string name = entry->d_name;
+        it->second.info.already.insert(winevfs_lower(name));
+      }
+
+      return entry;
+    }
+
     if (it == opendir_mappings.end()) {
       return NULL;
     }
 
-    if (!get_filename(&it->second.info, &filename))
-      return NULL;
+    std::string filename;
 
-    memcpy(it->second.temp->d_name, filename.c_str(), filename.size() + 1);
+    while (true) {
+      if (!get_filename(&it->second.info, &filename))
+        return NULL;
 
-    return it->second.temp;
+      if (it->second.info.already.find(winevfs_lower(filename)) != it->second.info.already.end())
+        continue;
+
+      strcpy(it->second.temp->d_name, filename.c_str());
+      //puts(it->second.temp->d_name);
+
+      return it->second.temp;
+    }
   }
 
   struct dirent64* readdir64(DIR* dirp) {
@@ -162,7 +176,7 @@ extern "C" {
     if (!get_filename(&it->second.info, &filename))
       return NULL;
 
-    memcpy(it->second.temp->d_name, filename.c_str(), filename.size() + 1);
+    strcpy(it->second.temp->d_name, filename.c_str());
 
     return it->second.temp;
   }
