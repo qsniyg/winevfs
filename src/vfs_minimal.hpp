@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef AT_FDCWD
+#  define AT_FDCWD -100
+#endif
+
 enum Intent
   {
    Intent_Read,
@@ -8,4 +12,4 @@ enum Intent
    Intent_Delete
   };
 
-const char* winevfs_get_path(const char* in, Intent intent);
+const char* winevfs_get_path(const char* in, Intent intent, int atfd=AT_FDCWD);

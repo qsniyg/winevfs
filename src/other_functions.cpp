@@ -14,6 +14,7 @@
 #include <bits/dirent.h>
 #include <dlfcn.h>
 #include "vfs_types.hpp"
+#include "vfs_minimal.hpp"
 #include "functions.hpp"
 
 //extern char** environ;
@@ -22,7 +23,7 @@ struct DIR;
 
 extern std::unordered_map<std::string, unique_vector> winevfs_folder_mappings;
 extern std::mutex winevfs_folder_mappings_mutex;
-std::string winevfs_abspath(std::string source);
+std::string winevfs_abspath(std::string source, int atfd=AT_FDCWD);
 
 struct opendir_base_info {
   std::string path;
@@ -46,8 +47,8 @@ static std::unordered_map<DIR*, opendir_info64> opendir64_mappings;
 static std::mutex opendir_mappings_mutex;
 std::string winevfs_lower(std::string& in);
 
-static bool winevfs_opendir_fill_info(char* path, opendir_base_info* info) {
-  std::string string_path = winevfs_abspath(std::string(path));
+static bool winevfs_opendir_fill_info(char* path, int atfd, opendir_base_info* info) {
+  std::string string_path = winevfs_abspath(std::string(path), atfd);
   info->path = winevfs_lower(string_path);
 
   info->finished = false;
@@ -63,9 +64,9 @@ static bool winevfs_opendir_fill_info(char* path, opendir_base_info* info) {
 }
 
 extern "C" {
-  void winevfs_add_opendir(DIR* dir, char* path) {
+  void winevfs_add_opendir(DIR* dir, char* path, int atfd) {
     struct opendir_info info;
-    if (!winevfs_opendir_fill_info(path, &info.info))
+    if (!winevfs_opendir_fill_info(path, atfd, &info.info))
       return;
 
     info.temp = new dirent;
@@ -74,9 +75,9 @@ extern "C" {
     opendir_mappings[dir] = info;
   }
 
-  void winevfs_add_opendir64(DIR* dir, char* path) {
+  void winevfs_add_opendir64(DIR* dir, char* path, int atfd) {
     struct opendir_info64 info;
-    if (!winevfs_opendir_fill_info(path, &info.info))
+    if (!winevfs_opendir_fill_info(path, atfd, &info.info))
       return;
 
     info.temp = new dirent64;

@@ -26,7 +26,8 @@ var _functions = [
     has_64: true,
     variadic: [
       ["mode_t", "mode"]
-    ]
+    ],
+    at: "dirfd"
   },
   {
     ret: "int",
@@ -86,6 +87,7 @@ var _functions = [
       ["struct stat*", "statbuf"],
       ["int", "flags"]
     ],
+    at: "dirfd",
     has_64: true
   },
   {
@@ -97,7 +99,8 @@ var _functions = [
       ["const char*", "file", "r"],
       ["int", "mode"],
       ["int", "flags"]
-    ]
+    ],
+    at: "dirfd"
   },
   {
     ret: "int",
@@ -130,7 +133,11 @@ var _functions = [
       ["const char*", "old", "d"],
       ["int", "newfd"],
       ["const char*", "newpath", "w"]
-    ]
+    ],
+    at: {
+      "old": "oldfd",
+      "newpath": "newfd"
+    }
   },
   {
     ret: "int",
@@ -141,7 +148,11 @@ var _functions = [
       ["int", "newfd"],
       ["const char*", "newpath", "w"],
       ["unsigned int", "flags"]
-    ]
+    ],
+    at: {
+      "old": "oldfd",
+      "newpath": "newfd"
+    }
   },
   {
     ret: "int",
@@ -152,7 +163,11 @@ var _functions = [
       ["int", "fd2"],
       ["const char*", "dst", "r"],
       ["unsigned int", "flags"]
-    ]
+    ],
+    at: {
+      "dst": "fd2",
+      "src": "fd1"
+    }
   },
   {
     ret: "int",
@@ -163,20 +178,27 @@ var _functions = [
       ["int", "tofd"],
       ["const char*", "to", "w"],
       ["int", "flags"]
-    ]
+    ],
+    at: {
+      "to": "tofd",
+      "from": "fromfd"
+    }
   },
   {
     ret: "int",
     name: "symlinkat",
     args: [
       ["const char*", "from", "r"],
-      ["int", "fd"],
+      ["int", "tofd"],
       ["const char*", "to", "w"],
-    ]
+    ],
+    at: {
+      "to": "tofd"
+    }
   },
   {
     ret: "int",
-    name: "mkdir",
+    name: ["mkdir", "__mkdir"],
     args: [
       ["const char*", "path", "r"],
       //["mode_t", "mode"]
@@ -209,7 +231,8 @@ var _functions = [
       ["const char*", "pathname", "r"],
       ["const struct timespec*", "times"],
       ["int", "flags"]
-    ]
+    ],
+    at: "dirfd"
   },
   {
     ret: "ssize_t",
@@ -251,8 +274,48 @@ var _functions = [
       ["const char*", "file", "r"],
       ["int", "mode"],
       ["int", "flag"]
+    ],
+    at: "fd"
+  },
+  {
+    ret: "ssize_t",
+    name: ["getxattr", "lgetxattr"],
+    args: [
+      ["const char*", "path", "r"],
+      ["const char*", "name"],
+      ["void*", "value"],
+      ["size_t", "size"]
     ]
   },
+  {
+    ret: "ssize_t",
+    name: ["listxattr", "llistxattr"],
+    args: [
+      ["const char*", "path", "r"],
+      ["char*", "list"],
+      ["size_t", "size"]
+    ]
+  },
+  {
+    ret: "int",
+    name: ["setxattr", "lsetxattr"],
+    args: [
+      ["const char*", "path", "r"],
+      ["const char*", "name"],
+      ["const void*", "value"],
+      ["size_t", "size"],
+      ["int", "flags"]
+    ]
+  },
+  {
+    ret: "int",
+    name: "removexattr",
+    args: [
+      ["const char*", "path", "r"],
+      ["const char*", "name"]
+    ]
+  },
+  // TODO: rmdir?
 
   {
     ret: "int",
@@ -360,14 +423,14 @@ var retstr = "";
 retstr += '#include "vfs_minimal.hpp"\n';
 retstr += "#include <sys/types.h>\n";
 retstr += "#define RTLD_NEXT ((void*) -1l)\n";
-retstr += "#define O_CREAT 0x0100\n";
+retstr += "#define O_CREAT 0100\n";
 
 retstr += 'extern "C" {\n';
 retstr += "extern void* dlsym (void* handle, const char* name);\n\n";
 retstr += "extern void free(void *ptr);";
 retstr += "extern int puts(const char *s);";
-retstr += "extern void winevfs_add_opendir(void* dir, const char* path);";
-retstr += "extern void winevfs_add_opendir64(void* dir, const char* path);";
+retstr += "extern void winevfs_add_opendir(void* dir, int atfd, const char* path);";
+retstr += "extern void winevfs_add_opendir64(void* dir, int atfd, const char* path);";
 retstr += "extern void fflush(void* stream);";
 retstr += "extern void* stdout;";
 
@@ -414,7 +477,15 @@ functions.forEach(fn => {
       }
 
       //retstr += "    puts(" + arg[1] + ");fflush(stdout);\n";
-      retstr += "    " + arg[1] + " = winevfs_get_path(" + arg[1] + ", " + iname + ");\n";
+      var at = "AT_FDCWD";
+      if (fn.at) {
+        if (typeof fn.at === "string") {
+          at = fn.at;
+        } else if (arg[1] in fn.at) {
+          at = fn.at[arg[1]];
+        }
+      }
+      retstr += "    " + arg[1] + " = winevfs_get_path(" + arg[1] + ", " + iname + ", " + at + ");\n";
 
       //retstr += "    puts(" + arg[1] + ");fflush(stdout);\n";
     }
@@ -429,7 +500,7 @@ functions.forEach(fn => {
   });
 
   if (fn.is_opendir) {
-    retstr += "    winevfs_add_" + fn.name + "(ret, orig_name);\n";
+    retstr += "    winevfs_add_" + fn.name + "(ret, AT_FDCWD, orig_name);\n";
   }
 
   retstr += "    return ret;\n";
