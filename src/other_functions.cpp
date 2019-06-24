@@ -8,7 +8,8 @@
 #include <sys/types.h>
 // Dirty hack, but how else are we going to do it?
 #define _DIRENT_H
-#include <dirent.h>
+//#include <dirent.h>
+#include <features.h>
 #include <bits/types.h>
 #include <bits/dirent.h>
 #include <dlfcn.h>
@@ -141,6 +142,10 @@ extern "C" {
 
   struct dirent64* readdir64(DIR* dirp) {
     //puts("readdir64");
+    if (sizeof(dirent64) == sizeof(dirent)) {
+      return (struct dirent64*)readdir(dirp);
+    }
+
     struct dirent64* entry = (struct dirent64*)winevfs__readdir64((void*)dirp);
     if (entry != NULL) {
       return entry;
