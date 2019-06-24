@@ -128,6 +128,17 @@ var _functions = [
   },
   {
     ret: "int",
+    name: ["renameat2", "__renameat2"],
+    args: [
+      ["int", "oldfd"],
+      ["const char*", "old", "d"],
+      ["int", "newfd"],
+      ["const char*", "newpath", "w"],
+      ["unsigned int", "flags"]
+    ]
+  },
+  {
+    ret: "int",
     name: "renameatu",
     args: [
       ["int", "fd1"],
@@ -201,6 +212,13 @@ var _functions = [
       ["const char*", "path", "r"],
       ["char*", "buf"],
       ["size_t", "bufsiz"]
+    ]
+  },
+  {
+    ret: "int",
+    name: ["chdir", "__chdir"],
+    args: [
+      ["const char*", "path", "r"]
     ]
   },
 
@@ -305,6 +323,8 @@ retstr += "extern void free(void *ptr);";
 retstr += "extern int puts(const char *s);";
 retstr += "extern void winevfs_add_opendir(void* dir, const char* path);";
 retstr += "extern void winevfs_add_opendir64(void* dir, const char* path);";
+retstr += "extern void fflush(void* stream);";
+retstr += "extern void* stdout;";
 
 
 functions.forEach(fn => {
@@ -326,7 +346,7 @@ functions.forEach(fn => {
     retstr += "    const char* orig_name = name;\n"
   }
 
-  //retstr += "    puts(\"" + fn.name + "\");\n";
+  //retstr += "    puts(\"" + fn.name + "\");fflush(stdout);\n";
   fn.args.forEach(arg => {
     if (arg.length === 3) {
       var iname = arg[1] + "_intent";
@@ -345,10 +365,10 @@ functions.forEach(fn => {
         retstr += "    " + iname + " = Intent_Delete;\n";
       }
 
-      //retstr += "    puts(" + arg[1] + ");\n";
+      //retstr += "    puts(" + arg[1] + ");fflush(stdout);\n";
       retstr += "    " + arg[1] + " = winevfs_get_path(" + arg[1] + ", " + iname + ");\n";
 
-      //retstr += "    puts(" + arg[1] + ");\n";
+      //retstr += "    puts(" + arg[1] + ");fflush(stdout);\n";
     }
   });
 

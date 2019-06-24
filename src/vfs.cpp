@@ -107,6 +107,9 @@ std::filesystem::path full_abspath(std::filesystem::path source) {
   return abspath_simple(path);
 }
 
+std::string winevfs_readlink_wrapper(const char* path) {
+}
+
 static std::filesystem::path simple_readlink(std::filesystem::path source) {
   source = abspath_simple(source);
 
@@ -145,12 +148,14 @@ static std::filesystem::path cached_readlink(std::filesystem::path source) {
   }
 
   char readlinked[PATH_MAX];
-  readlinked[0] = 0;
-  if (winevfs__readlink(source.c_str(), readlinked, PATH_MAX - 1) <= 0) {
+  ssize_t bytes = winevfs__readlink(source.c_str(), readlinked, PATH_MAX - 1);
+  if (bytes <= 0) {
     if (errno != EINVAL) // EINVAL = exists, but not a link
       return source;
     else
       strcpy(readlinked, source_str.c_str());
+  } else {
+    readlinked[bytes] = 0;
   }
 
   std::filesystem::path readlinked_path = readlinked;
@@ -475,7 +480,7 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
   //std::cout << path << std::endl;
   std::string path_lower = lower(path_str);
 
-  //std::cout << path_lower << std::endl;
+  //std::cout << "LOWER: " << path_lower << std::endl;
 
   // TODO: Handle Intent_Delete
 
@@ -492,6 +497,7 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
     auto it = winevfs_folder_mappings.find(path_lower);
     if (it != winevfs_folder_mappings.end()) {
       std::string win_path = winpath(path);
+      //std::cout << "WINP: " << win_path << std::endl;
       if (!fs_isdir(win_path))
         return "/tmp/.winevfs_fakedir/";
       else

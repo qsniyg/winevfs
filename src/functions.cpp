@@ -5,7 +5,7 @@
 extern "C" {
 extern void* dlsym (void* handle, const char* name);
 
-extern void free(void *ptr);extern int puts(const char *s);extern void winevfs_add_opendir(void* dir, const char* path);extern void winevfs_add_opendir64(void* dir, const char* path);int winevfs__open(const char* pathname, int flags, ...) {
+extern void free(void *ptr);extern int puts(const char *s);extern void winevfs_add_opendir(void* dir, const char* path);extern void winevfs_add_opendir64(void* dir, const char* path);extern void fflush(void* stream);extern void* stdout;int winevfs__open(const char* pathname, int flags, ...) {
     static int (*original)(const char*, int, ...) = (int (*)(const char*, int, ...))dlsym(RTLD_NEXT, "open");
     return original(pathname, flags);
 }
@@ -160,6 +160,16 @@ int winevfs__renameat(int oldfd, const char* old, int newfd, const char* newpath
     return original(oldfd, old, newfd, newpath);
 }
 
+int winevfs__renameat2(int oldfd, const char* old, int newfd, const char* newpath, unsigned int flags) {
+    static int (*original)(int, const char*, int, const char*, unsigned int) = (int (*)(int, const char*, int, const char*, unsigned int))dlsym(RTLD_NEXT, "renameat2");
+    return original(oldfd, old, newfd, newpath, flags);
+}
+
+int winevfs____renameat2(int oldfd, const char* old, int newfd, const char* newpath, unsigned int flags) {
+    static int (*original)(int, const char*, int, const char*, unsigned int) = (int (*)(int, const char*, int, const char*, unsigned int))dlsym(RTLD_NEXT, "__renameat2");
+    return original(oldfd, old, newfd, newpath, flags);
+}
+
 int winevfs__renameatu(int fd1, const char* src, int fd2, const char* dst, unsigned int flags) {
     static int (*original)(int, const char*, int, const char*, unsigned int) = (int (*)(int, const char*, int, const char*, unsigned int))dlsym(RTLD_NEXT, "renameatu");
     return original(fd1, src, fd2, dst, flags);
@@ -198,6 +208,16 @@ int winevfs__utimensat(int dirfd, const char* pathname, const struct timespec* t
 ssize_t winevfs__readlink(const char* path, char* buf, size_t bufsiz) {
     static ssize_t (*original)(const char*, char*, size_t) = (ssize_t (*)(const char*, char*, size_t))dlsym(RTLD_NEXT, "readlink");
     return original(path, buf, bufsiz);
+}
+
+int winevfs__chdir(const char* path) {
+    static int (*original)(const char*) = (int (*)(const char*))dlsym(RTLD_NEXT, "chdir");
+    return original(path);
+}
+
+int winevfs____chdir(const char* path) {
+    static int (*original)(const char*) = (int (*)(const char*))dlsym(RTLD_NEXT, "__chdir");
+    return original(path);
 }
 
 int winevfs__closedir(void* dir) {
@@ -502,6 +522,32 @@ int renameat(int oldfd, const char* old, int newfd, const char* newpath) {
     return ret;
 }
 
+int renameat2(int oldfd, const char* old, int newfd, const char* newpath, unsigned int flags) {
+    Intent old_intent = Intent_Read;
+    old_intent = Intent_Delete;
+    old = winevfs_get_path(old, old_intent);
+    Intent newpath_intent = Intent_Read;
+    newpath_intent = Intent_Create;
+    newpath = winevfs_get_path(newpath, newpath_intent);
+    int ret = winevfs__renameat2(oldfd, old, newfd, newpath, flags);
+    free((void*)old);
+    free((void*)newpath);
+    return ret;
+}
+
+int __renameat2(int oldfd, const char* old, int newfd, const char* newpath, unsigned int flags) {
+    Intent old_intent = Intent_Read;
+    old_intent = Intent_Delete;
+    old = winevfs_get_path(old, old_intent);
+    Intent newpath_intent = Intent_Read;
+    newpath_intent = Intent_Create;
+    newpath = winevfs_get_path(newpath, newpath_intent);
+    int ret = winevfs____renameat2(oldfd, old, newfd, newpath, flags);
+    free((void*)old);
+    free((void*)newpath);
+    return ret;
+}
+
 int renameatu(int fd1, const char* src, int fd2, const char* dst, unsigned int flags) {
     Intent src_intent = Intent_Read;
     src = winevfs_get_path(src, src_intent);
@@ -577,6 +623,22 @@ ssize_t readlink(const char* path, char* buf, size_t bufsiz) {
     Intent path_intent = Intent_Read;
     path = winevfs_get_path(path, path_intent);
     ssize_t ret = winevfs__readlink(path, buf, bufsiz);
+    free((void*)path);
+    return ret;
+}
+
+int chdir(const char* path) {
+    Intent path_intent = Intent_Read;
+    path = winevfs_get_path(path, path_intent);
+    int ret = winevfs__chdir(path);
+    free((void*)path);
+    return ret;
+}
+
+int __chdir(const char* path) {
+    Intent path_intent = Intent_Read;
+    path = winevfs_get_path(path, path_intent);
+    int ret = winevfs____chdir(path);
     free((void*)path);
     return ret;
 }
