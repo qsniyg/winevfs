@@ -131,32 +131,27 @@ static bool inited = false;
 static std::mutex inited_mutex;
 
 static void add_folder(std::filesystem::path folder) {
-  //std::cout << folder << std::endl;
-
   std::string folder_str = folder;
   std::string lowerfolder = lower(folder_str);
   std::string folder_filename = folder.filename();
-  std::string lowerfilename = lower(folder_filename);
-
-  {
-    std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
-    auto it = winevfs_folder_mappings.find(lowerfolder);
-    if (it != winevfs_folder_mappings.end()) {
-      it->second.insert(lowerfilename);
-      return;
-    }
-  }
 
   if (folder.has_parent_path() && folder.parent_path() != folder) {
     add_folder(folder.parent_path());
+
+    std::string parent_str = folder.parent_path();
+    std::string lowerparent = lower(parent_str);
+
+    {
+      std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
+      winevfs_folder_mappings[lowerparent].insert(folder_filename);
+    };
   }
 
-  unique_vector folder_set;
-  if (lowerfilename.size() > 0)
-    folder_set.insert(lowerfilename);
-
   std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
-  winevfs_folder_mappings[lowerfolder] = folder_set;
+  if (winevfs_folder_mappings.find(lowerfolder) == winevfs_folder_mappings.end()) {
+    unique_vector folder_set;
+    winevfs_folder_mappings[lowerfolder] = folder_set;
+  }
 }
 
 static void _add_read_entry(std::string source, std::string destination) {
