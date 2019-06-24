@@ -5,24 +5,24 @@
 extern "C" {
 extern void* dlsym (void* handle, const char* name);
 
-extern void free(void *ptr);extern int puts(const char *s);extern void winevfs_add_opendir(void* dir, const char* path);extern void winevfs_add_opendir64(void* dir, const char* path);extern void fflush(void* stream);extern void* stdout;int winevfs__open(const char* pathname, int flags, ...) {
+extern void free(void *ptr);extern int puts(const char *s);extern void winevfs_add_opendir(void* dir, const char* path);extern void winevfs_add_opendir64(void* dir, const char* path);extern void fflush(void* stream);extern void* stdout;int winevfs__open(const char* pathname, int flags, mode_t mode) {
     static int (*original)(const char*, int, ...) = (int (*)(const char*, int, ...))dlsym(RTLD_NEXT, "open");
-    return original(pathname, flags);
+    return original(pathname, flags, mode);
 }
 
-int winevfs__open64(const char* pathname, int flags, ...) {
+int winevfs__open64(const char* pathname, int flags, mode_t mode) {
     static int (*original)(const char*, int, ...) = (int (*)(const char*, int, ...))dlsym(RTLD_NEXT, "open64");
-    return original(pathname, flags);
+    return original(pathname, flags, mode);
 }
 
-int winevfs__openat(int dirfd, const char* pathname, int flags, ...) {
+int winevfs__openat(int dirfd, const char* pathname, int flags, mode_t mode) {
     static int (*original)(int, const char*, int, ...) = (int (*)(int, const char*, int, ...))dlsym(RTLD_NEXT, "openat");
-    return original(dirfd, pathname, flags);
+    return original(dirfd, pathname, flags, mode);
 }
 
-int winevfs__openat64(int dirfd, const char* pathname, int flags, ...) {
+int winevfs__openat64(int dirfd, const char* pathname, int flags, mode_t mode) {
     static int (*original)(int, const char*, int, ...) = (int (*)(int, const char*, int, ...))dlsym(RTLD_NEXT, "openat64");
-    return original(dirfd, pathname, flags);
+    return original(dirfd, pathname, flags, mode);
 }
 
 int winevfs__creat(const char* file, int mode) {
@@ -220,6 +220,26 @@ int winevfs____chdir(const char* path) {
     return original(path);
 }
 
+int winevfs__chmod(const char* file, int mode) {
+    static int (*original)(const char*, int) = (int (*)(const char*, int))dlsym(RTLD_NEXT, "chmod");
+    return original(file, mode);
+}
+
+int winevfs____chmod(const char* file, int mode) {
+    static int (*original)(const char*, int) = (int (*)(const char*, int))dlsym(RTLD_NEXT, "__chmod");
+    return original(file, mode);
+}
+
+int winevfs__lchmod(const char* file, int mode) {
+    static int (*original)(const char*, int) = (int (*)(const char*, int))dlsym(RTLD_NEXT, "lchmod");
+    return original(file, mode);
+}
+
+int winevfs__fchmodat(int fd, const char* file, int mode, int flag) {
+    static int (*original)(int, const char*, int, int) = (int (*)(int, const char*, int, int))dlsym(RTLD_NEXT, "fchmodat");
+    return original(fd, file, mode, flag);
+}
+
 int winevfs__closedir(void* dir) {
     static int (*original)(void*) = (int (*)(void*))dlsym(RTLD_NEXT, "closedir");
     return original(dir);
@@ -237,46 +257,46 @@ void* winevfs__readdir64(void* dir) {
 
 
 
-int open(const char* pathname, int flags, ...) {
+int winevfs_variadic__open(const char* pathname, int flags, mode_t mode) {
     Intent pathname_intent = Intent_Read;
     if (flags & O_CREAT) {
         pathname_intent = Intent_Create;
     }
     pathname = winevfs_get_path(pathname, pathname_intent);
-    int ret = winevfs__open(pathname, flags);
+    int ret = winevfs__open(pathname, flags, mode);
     free((void*)pathname);
     return ret;
 }
 
-int open64(const char* pathname, int flags, ...) {
+int winevfs_variadic__open64(const char* pathname, int flags, mode_t mode) {
     Intent pathname_intent = Intent_Read;
     if (flags & O_CREAT) {
         pathname_intent = Intent_Create;
     }
     pathname = winevfs_get_path(pathname, pathname_intent);
-    int ret = winevfs__open64(pathname, flags);
+    int ret = winevfs__open64(pathname, flags, mode);
     free((void*)pathname);
     return ret;
 }
 
-int openat(int dirfd, const char* pathname, int flags, ...) {
+int winevfs_variadic__openat(int dirfd, const char* pathname, int flags, mode_t mode) {
     Intent pathname_intent = Intent_Read;
     if (flags & O_CREAT) {
         pathname_intent = Intent_Create;
     }
     pathname = winevfs_get_path(pathname, pathname_intent);
-    int ret = winevfs__openat(dirfd, pathname, flags);
+    int ret = winevfs__openat(dirfd, pathname, flags, mode);
     free((void*)pathname);
     return ret;
 }
 
-int openat64(int dirfd, const char* pathname, int flags, ...) {
+int winevfs_variadic__openat64(int dirfd, const char* pathname, int flags, mode_t mode) {
     Intent pathname_intent = Intent_Read;
     if (flags & O_CREAT) {
         pathname_intent = Intent_Create;
     }
     pathname = winevfs_get_path(pathname, pathname_intent);
-    int ret = winevfs__openat64(dirfd, pathname, flags);
+    int ret = winevfs__openat64(dirfd, pathname, flags, mode);
     free((void*)pathname);
     return ret;
 }
@@ -641,6 +661,62 @@ int __chdir(const char* path) {
     int ret = winevfs____chdir(path);
     free((void*)path);
     return ret;
+}
+
+int chmod(const char* file, int mode) {
+    Intent file_intent = Intent_Read;
+    file = winevfs_get_path(file, file_intent);
+    int ret = winevfs__chmod(file, mode);
+    free((void*)file);
+    return ret;
+}
+
+int __chmod(const char* file, int mode) {
+    Intent file_intent = Intent_Read;
+    file = winevfs_get_path(file, file_intent);
+    int ret = winevfs____chmod(file, mode);
+    free((void*)file);
+    return ret;
+}
+
+int lchmod(const char* file, int mode) {
+    Intent file_intent = Intent_Read;
+    file = winevfs_get_path(file, file_intent);
+    int ret = winevfs__lchmod(file, mode);
+    free((void*)file);
+    return ret;
+}
+
+int fchmodat(int fd, const char* file, int mode, int flag) {
+    Intent file_intent = Intent_Read;
+    file = winevfs_get_path(file, file_intent);
+    int ret = winevfs__fchmodat(fd, file, mode, flag);
+    free((void*)file);
+    return ret;
+}
+
+int open(const char* pathname, int flags, ...) {
+    void* args = __builtin_apply_args();
+    void* ret = __builtin_apply((void(*)(...))winevfs_variadic__open, args, 100);
+    __builtin_return(ret);
+}
+
+int open64(const char* pathname, int flags, ...) {
+    void* args = __builtin_apply_args();
+    void* ret = __builtin_apply((void(*)(...))winevfs_variadic__open64, args, 100);
+    __builtin_return(ret);
+}
+
+int openat(int dirfd, const char* pathname, int flags, ...) {
+    void* args = __builtin_apply_args();
+    void* ret = __builtin_apply((void(*)(...))winevfs_variadic__openat, args, 100);
+    __builtin_return(ret);
+}
+
+int openat64(int dirfd, const char* pathname, int flags, ...) {
+    void* args = __builtin_apply_args();
+    void* ret = __builtin_apply((void(*)(...))winevfs_variadic__openat64, args, 100);
+    __builtin_return(ret);
 }
 
 }

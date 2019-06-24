@@ -9,7 +9,10 @@ var _functions = [
       ["int", "flags"],
       ["..."]
     ],
-    has_64: true
+    has_64: true,
+    variadic: [
+      ["mode_t", "mode"]
+    ]
   },
   {
     ret: "int",
@@ -20,7 +23,10 @@ var _functions = [
       ["int", "flags"],
       ["..."]
     ],
-    has_64: true
+    has_64: true,
+    variadic: [
+      ["mode_t", "mode"]
+    ]
   },
   {
     ret: "int",
@@ -221,6 +227,32 @@ var _functions = [
       ["const char*", "path", "r"]
     ]
   },
+  {
+    ret: "int",
+    name: ["chmod", "__chmod"],
+    args: [
+      ["const char*", "file", "r"],
+      ["int", "mode"]
+    ]
+  },
+  {
+    ret: "int",
+    name: "lchmod",
+    args: [
+      ["const char*", "file", "r"],
+      ["int", "mode"]
+    ]
+  },
+  {
+    ret: "int",
+    name: "fchmodat",
+    args: [
+      ["int", "fd"],
+      ["const char*", "file", "r"],
+      ["int", "mode"],
+      ["int", "flag"]
+    ]
+  },
 
   {
     ret: "int",
@@ -269,16 +301,22 @@ _functions.forEach(fn => {
   }
 });
 
-function fnheader(fn, fnname) {
+function fnheader(fn, fnname, variadic) {
   var ret = fn.ret;
   ret += " " + (fnname || fn.name);
   ret += "(";
 
   var args = [];
   fn.args.forEach(arg => {
-    if (arg.length === 1)
-      args.push(arg[0]);
-    else {
+    if (arg.length === 1) {
+      if (variadic)
+        args.push(arg[0]);
+      else {
+        fn.variadic.forEach(varg => {
+          args.push(varg[0] + " " + varg[1]);
+        });
+      }
+    } else {
       args.push(arg[0] + " " + arg[1]);
     }
   });
@@ -300,11 +338,18 @@ function vartype(fn, varname) {
   return ret;
 }
 
-function varnames(fn) {
+function varnames(fn, variadic) {
   var args = [];
   fn.args.forEach(arg => {
     if (arg.length > 1)
       args.push(arg[1]);
+    else if (variadic)
+      args.push(arg[0]);
+    else {
+      fn.variadic.forEach(varg => {
+        args.push(varg[1]);
+      });
+    }
   });
 
   return args.join(", ");
@@ -340,7 +385,10 @@ functions.forEach(fn => {
   if (fn.origonly)
     return;
 
-  retstr += fnheader(fn) + " {\n";
+  var fnname = null;
+  if (fn.variadic)
+    fnname = "winevfs_variadic__" + fn.name;
+  retstr += fnheader(fn, fnname) + " {\n";
 
   if (fn.is_opendir) {
     retstr += "    const char* orig_name = name;\n"
@@ -386,6 +434,17 @@ functions.forEach(fn => {
 
   retstr += "    return ret;\n";
 
+  retstr += "}\n\n";
+});
+
+functions.forEach(fn => {
+  if (!fn.variadic)
+    return;
+
+  retstr += fnheader(fn, false, true) + " {\n";
+  retstr += "    void* args = __builtin_apply_args();\n";
+  retstr += "    void* ret = __builtin_apply((void(*)(...))winevfs_variadic__" + fn.name + ", args, 100);\n";
+  retstr += "    __builtin_return(ret);\n";
   retstr += "}\n\n";
 });
 

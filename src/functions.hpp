@@ -1,8 +1,8 @@
 extern "C" {
-int winevfs__open(const char* pathname, int flags, ...);
-int winevfs__open64(const char* pathname, int flags, ...);
-int winevfs__openat(int dirfd, const char* pathname, int flags, ...);
-int winevfs__openat64(int dirfd, const char* pathname, int flags, ...);
+int winevfs__open(const char* pathname, int flags, mode_t mode);
+int winevfs__open64(const char* pathname, int flags, mode_t mode);
+int winevfs__openat(int dirfd, const char* pathname, int flags, mode_t mode);
+int winevfs__openat64(int dirfd, const char* pathname, int flags, mode_t mode);
 int winevfs__creat(const char* file, int mode);
 int winevfs__creat64(const char* file, int mode);
 void* winevfs__fopen(const char* pathname, const char* mode);
@@ -42,6 +42,10 @@ int winevfs__utimensat(int dirfd, const char* pathname, const struct timespec* t
 ssize_t winevfs__readlink(const char* path, char* buf, size_t bufsiz);
 int winevfs__chdir(const char* path);
 int winevfs____chdir(const char* path);
+int winevfs__chmod(const char* file, int mode);
+int winevfs____chmod(const char* file, int mode);
+int winevfs__lchmod(const char* file, int mode);
+int winevfs__fchmodat(int fd, const char* file, int mode, int flag);
 int winevfs__closedir(void* dir);
 void* winevfs__readdir(void* dir);
 void* winevfs__readdir64(void* dir);
