@@ -1,6 +1,7 @@
 set(BASE_SOURCES
   vfs.cpp
   functions.cpp
+  other_functions.cpp
   )
 
 add_library(winevfs_lib64 SHARED ${BASE_SOURCES})

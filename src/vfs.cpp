@@ -1,5 +1,6 @@
 #include "vfs.hpp"
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <algorithm>
 #include <filesystem>
@@ -13,10 +14,14 @@
 #include "functions.hpp"
 
 // TODO: improve
-static std::string lower(std::string& in) {
+std::string winevfs_lower(std::string& in) {
   std::string out = in;
   std::transform(out.begin(), out.end(), out.begin(), ::tolower);
   return out;
+}
+
+static std::string lower(std::string& in) {
+  return winevfs_lower(in);
 }
 
 static int real_stat(const char* str, struct stat* buf) {
@@ -46,6 +51,10 @@ static DIR* fs_opendir(std::filesystem::path source) {
   return (DIR*)winevfs__opendir(path_str.c_str());
 }
 
+bool has_parent_path(std::filesystem::path source) {
+  return source.has_parent_path() && source.parent_path() != source;
+}
+
 void fs_mkdir_p(std::filesystem::path source) {
   if (!source.has_parent_path()) {
     return;
@@ -70,7 +79,7 @@ static std::filesystem::path abspath_simple(std::filesystem::path source) {
   std::filesystem::path new_path;
 
   for (auto it = source.begin(); it != source.end(); it++) {
-    if (*it == ".")
+    if (*it == "." || *it == "")
       continue;
     if (*it == "..") {
       if (new_path.has_parent_path()) {
@@ -92,9 +101,22 @@ std::filesystem::path winevfs_abspath(std::filesystem::path source) {
     return path;
 
   // TODO: maybe cache?
+  // TODO: resolve links (dosdevices/c: -> drive_c)
   path = fs_getcwd() / path;
   return abspath_simple(path);
-  //return std::filesystem::absolute(source);
+}
+
+std::string winevfs_abspath(std::string source) {
+  return std::string(winevfs_abspath(std::filesystem::path(source)));
+}
+
+void unique_vector::insert(std::string string) {
+  std::string lowerstring = lower(string);
+  auto it = this->set.find(lowerstring);
+  if (it == this->set.end()) {
+    this->set.insert(lowerstring);
+    this->vector.push_back(string);
+  }
 }
 
 // TODO: somehow make this work better multi-process
@@ -102,13 +124,56 @@ static std::unordered_map<std::string, std::string> read_mappings;
 static std::mutex read_mappings_mutex;
 static std::unordered_map<std::string, std::string> write_mappings;
 static std::mutex write_mappings_mutex;
+std::unordered_map<std::string, unique_vector> winevfs_folder_mappings;
+std::mutex winevfs_folder_mappings_mutex;
 //std::unordered_map<std::string, std::string> unlink_mappings; // TODO
 static bool inited = false;
 static std::mutex inited_mutex;
 
-void _add_read_entry(std::string source, std::string destination) {
-  std::lock_guard<std::mutex> lock(read_mappings_mutex);
-  read_mappings[lower(source)] = destination;
+static void add_folder(std::filesystem::path folder) {
+  //std::cout << folder << std::endl;
+
+  std::string folder_str = folder;
+  std::string lowerfolder = lower(folder_str);
+  std::string folder_filename = folder.filename();
+  std::string lowerfilename = lower(folder_filename);
+
+  {
+    std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
+    auto it = winevfs_folder_mappings.find(lowerfolder);
+    if (it != winevfs_folder_mappings.end()) {
+      it->second.insert(lowerfilename);
+      return;
+    }
+  }
+
+  if (folder.has_parent_path() && folder.parent_path() != folder) {
+    add_folder(folder.parent_path());
+  }
+
+  unique_vector folder_set;
+  if (lowerfilename.size() > 0)
+    folder_set.insert(lowerfilename);
+
+  std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
+  winevfs_folder_mappings[lowerfolder] = folder_set;
+}
+
+static void _add_read_entry(std::string source, std::string destination) {
+  {
+    std::lock_guard<std::mutex> lock(read_mappings_mutex);
+    read_mappings[lower(source)] = destination;
+  };
+
+  std::filesystem::path source_path = source;
+  add_folder(source_path.parent_path());
+
+  {
+    std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
+    std::string parent_str = source_path.parent_path();
+    std::string source_filename = source_path.filename();
+    winevfs_folder_mappings[lower(parent_str)].insert(source_filename);
+  };
   //std::cout << source << std::endl;
   //std::cout << destination << std::endl;
 }
@@ -122,7 +187,7 @@ void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::p
 
     if (d) {
       struct dirent* entry;
-      while ((entry = readdir(d)) != NULL) {
+      while ((entry = (struct dirent*)winevfs__readdir(d)) != NULL) {
         if (entry->d_name[0] == '.') {
           if (entry->d_name[1] == 0)
             continue;
@@ -207,7 +272,7 @@ static std::filesystem::path winpath(std::filesystem::path source) {
     struct dirent* entry;
 
     if (d) {
-      while ((entry = readdir(d)) != NULL) {
+      while ((entry = (struct dirent*)winevfs__readdir(d)) != NULL) {
         std::string filename = entry->d_name;
         if (lower(filename) == basename_lower) {
           closedir(d);
@@ -286,6 +351,8 @@ void winevfs_read_vfsfile(char* envfile) {
     }
   }
 
+  free(line);
+
   fclose(fp);
 }
 
@@ -328,13 +395,17 @@ void winevfs_init() {
 
   winevfs_read_vfsfile(envfile);
   inited = true;
+
+  // TODO: empty this directory
+  fs_mkdir_p("/tmp/.winevfs_fakedir/");
 }
 
 std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
   winevfs_init();
+  //printf("%i\n", getpid());
 
   //std::cout << in << std::endl;
-  std::filesystem::path path = winpath(winevfs_abspath(in));
+  std::filesystem::path path = winevfs_abspath(in);
   //std::cout << path << std::endl;
   std::string path_lower = path;
   path_lower = lower(path_lower);
@@ -349,6 +420,18 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
     }
   };
 
+  {
+    std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
+    auto it = winevfs_folder_mappings.find(path_lower);
+    if (it != winevfs_folder_mappings.end()) {
+      std::string win_path = winpath(path);
+      if (!fs_isdir(win_path))
+        return "/tmp/.winevfs_fakedir/";
+      else
+        return win_path;
+    }
+  }
+
   if (intent == Intent_Modify || intent == Intent_Create) {
     {
       std::lock_guard<std::mutex> lock(write_mappings_mutex);
@@ -362,8 +445,9 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
           std::filesystem::path newpath = std::filesystem::path(it->second) / std::filesystem::path(rest);
           fs_mkdir_p(newpath.parent_path());
 
-          std::lock_guard<std::mutex> read_lock(read_mappings_mutex);
-          read_mappings[path_lower] = newpath;
+          _add_read_entry(path, newpath);
+          //std::lock_guard<std::mutex> read_lock(read_mappings_mutex);
+          //read_mappings[path_lower] = newpath;
           //std::cout << it->second << std::endl;
           //std::cout << path_lower << std::endl;
           //std::cout << newpath << std::endl;
@@ -373,7 +457,7 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent) {
     };
   }
 
-  return path;
+  return winpath(path);
 }
 
 const char* winevfs_get_path(const char* in, Intent intent) {

@@ -1,9 +1,11 @@
 #pragma once
 
 #include "vfs_minimal.hpp"
+#include "vfs_types.hpp"
 #include <filesystem>
 #include <string>
 
+std::string winevfs_lower(std::string& in);
 std::filesystem::path winevfs_abspath(std::filesystem::path source);
 void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::path destination);
 void winevfs_add_read_file(std::filesystem::path source, std::filesystem::path destination);

@@ -1,11 +1,32 @@
 extern "C" {
 int winevfs__open(const char* pathname, int flags, ...);
+int winevfs__open64(const char* pathname, int flags, ...);
 int winevfs__openat(int dirfd, const char* pathname, int flags, ...);
+int winevfs__openat64(int dirfd, const char* pathname, int flags, ...);
+int winevfs__creat(const char* file, int mode);
+int winevfs__creat64(const char* file, int mode);
 void* winevfs__fopen(const char* pathname, const char* mode);
+void* winevfs__fopen64(const char* pathname, const char* mode);
+void* winevfs__freopen(const char* pathname, const char* mode, void* stream);
+void* winevfs__freopen64(const char* pathname, const char* mode, void* stream);
+int winevfs__stat(int ver, const char* path, struct stat* buf);
+int winevfs__stat64(int ver, const char* path, struct stat* buf);
 int winevfs____xstat(int ver, const char* path, struct stat* buf);
+int winevfs____xstat64(int ver, const char* path, struct stat* buf);
+int winevfs__lstat(int ver, const char* path, struct stat* buf);
+int winevfs__lstat64(int ver, const char* path, struct stat* buf);
 int winevfs____lxstat(int ver, const char* path, struct stat* buf);
+int winevfs____lxstat64(int ver, const char* path, struct stat* buf);
+int winevfs____lstat(int ver, const char* path, struct stat* buf);
+int winevfs____lstat64(int ver, const char* path, struct stat* buf);
+int winevfs__fstatat(int ver, int dirfd, const char* path, struct stat* statbuf, int flags);
+int winevfs__fstatat64(int ver, int dirfd, const char* path, struct stat* statbuf, int flags);
 int winevfs____fxstatat(int ver, int dirfd, const char* path, struct stat* statbuf, int flags);
+int winevfs____fxstatat64(int ver, int dirfd, const char* path, struct stat* statbuf, int flags);
 int winevfs__faccessat(int dirfd, const char* file, int mode, int flags);
+int winevfs____faccessat(int dirfd, const char* file, int mode, int flags);
+int winevfs__access(const char* file, int type);
+int winevfs____access(const char* file, int type);
 int winevfs__unlink(const char* path);
 int winevfs__rename(const char* old, const char* newpath);
 int winevfs__renameat(int oldfd, const char* old, int newfd, const char* newpath);
@@ -14,5 +35,10 @@ int winevfs__linkat(int fromfd, const char* from, int tofd, const char* to, int 
 int winevfs__symlinkat(const char* from, int fd, const char* to);
 int winevfs__mkdir(const char* path, unsigned int mode);
 void* winevfs__opendir(const char* name);
+void* winevfs__opendir64(const char* name);
 int winevfs__utimensat(int dirfd, const char* pathname, const struct timespec* times, int flags);
+int winevfs__readlink(const char* path, char* buf, int bufsiz);
+int winevfs__closedir(void* dir);
+void* winevfs__readdir(void* dir);
+void* winevfs__readdir64(void* dir);
 }

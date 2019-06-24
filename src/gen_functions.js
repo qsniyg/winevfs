@@ -8,7 +8,8 @@ var _functions = [
       ["const char*", "pathname", "open_intent"],
       ["int", "flags"],
       ["..."]
-    ]
+    ],
+    has_64: true
   },
   {
     ret: "int",
@@ -18,7 +19,17 @@ var _functions = [
       ["const char*", "pathname", "open_intent"],
       ["int", "flags"],
       ["..."]
-    ]
+    ],
+    has_64: true
+  },
+  {
+    ret: "int",
+    name: "creat",
+    args: [
+      ["const char*", "file", "w"],
+      ["int", "mode"]
+    ],
+    has_64: true
   },
   {
     ret: "void*",
@@ -26,46 +37,68 @@ var _functions = [
     args: [
       ["const char*", "pathname", "fopen_intent"],
       ["const char*", "mode"]
-    ]
+    ],
+    has_64: true
+  },
+  {
+    ret: "void*",
+    name: "freopen",
+    args: [
+      ["const char*", "pathname", "fopen_intent"],
+      ["const char*", "mode"],
+      ["void*", "stream"]
+    ],
+    has_64: true
   },
   {
     ret: "int",
-    name: "__xstat",
+    name: ["stat", "__xstat"],
     args: [
       ["int", "ver"],
       ["const char*", "path", "r"],
       ["struct stat*", "buf"]
-    ]
+    ],
+    has_64: true
   },
   {
     ret: "int",
-    name: "__lxstat",
+    name: ["lstat", "__lxstat", "__lstat"],
     args: [
       ["int", "ver"],
       ["const char*", "path", "r"],
       ["struct stat*", "buf"]
-    ]
+    ],
+    has_64: true
   },
   {
     ret: "int",
-    name: "__fxstatat",
+    name: ["fstatat", "__fxstatat"],
     args: [
       ["int", "ver"],
       ["int", "dirfd"],
       ["const char*", "path", "r"],
       ["struct stat*", "statbuf"],
       ["int", "flags"]
-    ]
+    ],
+    has_64: true
   },
   {
     ret: "int",
-    name: "faccessat",
+    name: ["faccessat", "__faccessat"],
     args: [
       ["int", "dirfd"],
       // FIXME: should it be R for W_OK?
       ["const char*", "file", "r"],
       ["int", "mode"],
       ["int", "flags"]
+    ]
+  },
+  {
+    ret: "int",
+    name: ["access", "__access"],
+    args: [
+      ["const char*", "file", "r"],
+      ["int", "type"]
     ]
   },
   {
@@ -147,7 +180,9 @@ var _functions = [
     name: "opendir",
     args: [
       ["const char*", "name", "r"]
-    ]
+    ],
+    is_opendir: true,
+    has_64: true
   },
   {
     ret: "int",
@@ -158,6 +193,33 @@ var _functions = [
       ["const struct timespec*", "times"],
       ["int", "flags"]
     ]
+  },
+  {
+    ret: "int",
+    name: "readlink",
+    args: [
+      ["const char*", "path", "r"],
+      ["char*", "buf"],
+      ["int", "bufsiz"]
+    ]
+  },
+
+  {
+    ret: "int",
+    name: "closedir",
+    args: [
+      ["void*", "dir"]
+    ],
+    origonly: true
+  },
+  {
+    ret: "void*",
+    name: "readdir",
+    args: [
+      ["void*", "dir"]
+    ],
+    origonly: true,
+    has_64: true
   }
 ];
 
@@ -166,7 +228,27 @@ _functions.forEach(fn => {
   if (fn.disabled)
     return;
 
-  functions.push(fn);
+  if (fn.name instanceof Array) {
+    fn.name.forEach(name => {
+      var newfn = JSON.parse(JSON.stringify(fn));
+      newfn.name = name;
+      functions.push(newfn);
+
+      if (newfn.has_64) {
+        newfn = JSON.parse(JSON.stringify(newfn));
+        newfn.name += "64";
+        functions.push(newfn);
+      }
+    });
+  } else {
+    functions.push(fn);
+
+    if (fn.has_64) {
+      fn = JSON.parse(JSON.stringify(fn));
+      fn.name += "64";
+      functions.push(fn);
+    }
+  }
 });
 
 function fnheader(fn, fnname) {
@@ -220,6 +302,8 @@ retstr += 'extern "C" {\n';
 retstr += "extern void* dlsym (void* handle, const char* name);\n\n";
 retstr += "extern void free(void *ptr);";
 retstr += "extern int puts(const char *s);";
+retstr += "extern void winevfs_add_opendir(void* dir, const char* path);";
+retstr += "extern void winevfs_add_opendir64(void* dir, const char* path);";
 
 
 functions.forEach(fn => {
@@ -232,7 +316,15 @@ functions.forEach(fn => {
 retstr += "\n\n";
 
 functions.forEach(fn => {
+  if (fn.origonly)
+    return;
+
   retstr += fnheader(fn) + " {\n";
+
+  if (fn.is_opendir) {
+    retstr += "    const char* orig_name = name;\n"
+  }
+
   //retstr += "    puts(\"" + fn.name + "\");\n";
   fn.args.forEach(arg => {
     if (arg.length === 3) {
@@ -265,6 +357,10 @@ functions.forEach(fn => {
       retstr += "    free((void*)" + arg[1] + ");\n";
     }
   });
+
+  if (fn.is_opendir) {
+    retstr += "    winevfs_add_" + fn.name + "(ret, orig_name);\n";
+  }
 
   retstr += "    return ret;\n";
 
