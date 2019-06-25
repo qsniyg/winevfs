@@ -149,32 +149,36 @@ static std::filesystem::path cached_readlink(std::filesystem::path source) {
   source = abspath_simple(source);
   std::string source_str = source;
   if (!strncmp(source_str.c_str(), "/proc", sizeof("/proc") - 1)) {
+    // TODO: readlink this too
     return source;
   }
 
-  std::string lowersource = lower(source_str);
+  //std::string lowersource = lower(source_str);
   {
     std::lock_guard<std::mutex> lock(readlink_cache_mutex);
-    auto it = readlink_cache.find(lowersource);
+    //auto it = readlink_cache.find(lowersource);
+    auto it = readlink_cache.find(source_str);
     if (it != readlink_cache.end())
       return it->second;
   }
 
+  //puts(source_str.c_str());
+
   if (has_parent_path(source)) {
     std::filesystem::path readlinked_parent = cached_readlink(source.parent_path());
     source = readlinked_parent / source.filename();
-    source_str = source;
-    lowersource = lower(source_str);
+    //source_str = source;
+    //lowersource = lower(source_str);
   }
 
   // TODO: if parent doesn't exist, don't check readlink
   char readlinked[PATH_MAX];
   ssize_t bytes = winevfs__readlink(source.c_str(), readlinked, PATH_MAX - 1);
   if (bytes <= 0) {
-    if (errno != EINVAL) // EINVAL = exists, but not a link
+    if (errno != EINVAL && false) // EINVAL = exists, but not a link
       return source;
     else
-      strcpy(readlinked, source_str.c_str());
+      strcpy(readlinked, std::string(source).c_str());
   } else {
     readlinked[bytes] = 0;
   }
@@ -184,7 +188,12 @@ static std::filesystem::path cached_readlink(std::filesystem::path source) {
     readlinked_path = abspath_simple(source.parent_path() / readlinked_path);
 
   std::lock_guard<std::mutex> lock(readlink_cache_mutex);
-  readlink_cache[lowersource] = readlinked_path;
+  //readlink_cache[lowersource] = readlinked_path;
+  //std::cout << source_str << std::endl;
+  //std::cout << std::string(source) << std::endl;
+  //std::cout << "---" << std::endl;
+  readlink_cache[source_str] = readlinked_path;
+  readlink_cache[source] = readlinked_path;
 
   return readlinked_path;
 }
