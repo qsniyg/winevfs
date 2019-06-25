@@ -28,19 +28,37 @@ static int real_stat(const char* str, struct stat* buf) {
   return winevfs____xstat(_STAT_VER_LINUX, str, buf);
 }
 
-static int fs_stat(std::filesystem::path path, struct stat* buf) {
+static std::unordered_map<std::string, struct stat> stat_cache;
+static std::mutex stat_cache_mutex;
+static int fs_stat(std::filesystem::path path, struct stat* buf, bool use_cache = false) {
   std::string path_str = path;
-  return real_stat(path_str.c_str(), buf);
+
+  if (use_cache) {
+    std::lock_guard<std::mutex> lock(stat_cache_mutex);
+    auto it = stat_cache.find(path_str);
+    if (it != stat_cache.end()) {
+      *buf = it->second;
+      return 0;
+    }
+  }
+
+  int ret = real_stat(path_str.c_str(), buf);
+  if (ret == 0) {
+    std::lock_guard<std::mutex> lock(stat_cache_mutex);
+    stat_cache[path_str] = *buf;
+  }
+
+  return ret;
 }
 
-static bool fs_exists(std::filesystem::path source) {
+static bool fs_exists(std::filesystem::path source, bool use_cache = false) {
   struct stat s;
-  return fs_stat(source, &s) == 0;
+  return fs_stat(source, &s, use_cache) == 0;
 }
 
-static bool fs_isdir(std::filesystem::path source) {
+static bool fs_isdir(std::filesystem::path source, bool use_cache = false) {
   struct stat s;
-  if (fs_stat(source, &s))
+  if (fs_stat(source, &s, use_cache))
     return false;
 
   return S_ISDIR(s.st_mode);
@@ -532,8 +550,7 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent, int atfd) 
       std::string win_path = winpath(path, atfd);
       //std::cout << "WINP: " << win_path << std::endl;fflush(stdout);
 
-      // FIXME: this runs stat again, after winpath has already run it
-      if (!fs_isdir(win_path))
+      if (!fs_isdir(win_path, true))
         return "/tmp/.winevfs_fakedir/";
       else
         return win_path;

@@ -510,12 +510,12 @@ functions.forEach(fn => {
     }
   });
 
-  var at = "AT_FDCWD";
-  if (fn.at) {
-    at = fn.at;
-  }
-
   if (fn.is_opendir) {
+    var at = "AT_FDCWD";
+    if (fn.at) {
+      at = fn.at;
+    }
+
     retstr += "    winevfs_add_" + fn.name.replace(/_/g, "").replace(/at/, "") + "(ret, orig_name, " + at + ");\n";
   }
 
