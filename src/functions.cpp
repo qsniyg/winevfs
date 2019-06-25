@@ -205,6 +205,36 @@ void* winevfs__opendir64(const char* name) {
     return original(name);
 }
 
+void* winevfs____opendir(const char* name) {
+    static void* (*original)(const char*) = (void* (*)(const char*))dlsym(RTLD_NEXT, "__opendir");
+    return original(name);
+}
+
+void* winevfs____opendir64(const char* name) {
+    static void* (*original)(const char*) = (void* (*)(const char*))dlsym(RTLD_NEXT, "__opendir64");
+    return original(name);
+}
+
+void* winevfs__opendirat(int dirfd, const char* name) {
+    static void* (*original)(int, const char*) = (void* (*)(int, const char*))dlsym(RTLD_NEXT, "opendirat");
+    return original(dirfd, name);
+}
+
+void* winevfs__opendirat64(int dirfd, const char* name) {
+    static void* (*original)(int, const char*) = (void* (*)(int, const char*))dlsym(RTLD_NEXT, "opendirat64");
+    return original(dirfd, name);
+}
+
+void* winevfs____opendirat(int dirfd, const char* name) {
+    static void* (*original)(int, const char*) = (void* (*)(int, const char*))dlsym(RTLD_NEXT, "__opendirat");
+    return original(dirfd, name);
+}
+
+void* winevfs____opendirat64(int dirfd, const char* name) {
+    static void* (*original)(int, const char*) = (void* (*)(int, const char*))dlsym(RTLD_NEXT, "__opendirat64");
+    return original(dirfd, name);
+}
+
 int winevfs__utimensat(int dirfd, const char* pathname, const struct timespec* times, int flags) {
     static int (*original)(int, const char*, const struct timespec*, int) = (int (*)(int, const char*, const struct timespec*, int))dlsym(RTLD_NEXT, "utimensat");
     return original(dirfd, pathname, times, flags);
@@ -676,6 +706,66 @@ void* opendir64(const char* name) {
     void* ret = winevfs__opendir64(name);
     free((void*)name);
     winevfs_add_opendir64(ret, orig_name, AT_FDCWD);
+    return ret;
+}
+
+void* __opendir(const char* name) {
+    const char* orig_name = name;
+    Intent name_intent = Intent_Read;
+    name = winevfs_get_path(name, name_intent, AT_FDCWD);
+    void* ret = winevfs____opendir(name);
+    free((void*)name);
+    winevfs_add_opendir(ret, orig_name, AT_FDCWD);
+    return ret;
+}
+
+void* __opendir64(const char* name) {
+    const char* orig_name = name;
+    Intent name_intent = Intent_Read;
+    name = winevfs_get_path(name, name_intent, AT_FDCWD);
+    void* ret = winevfs____opendir64(name);
+    free((void*)name);
+    winevfs_add_opendir64(ret, orig_name, AT_FDCWD);
+    return ret;
+}
+
+void* opendirat(int dirfd, const char* name) {
+    const char* orig_name = name;
+    Intent name_intent = Intent_Read;
+    name = winevfs_get_path(name, name_intent, dirfd);
+    void* ret = winevfs__opendirat(dirfd, name);
+    free((void*)name);
+    winevfs_add_opendir(ret, orig_name, dirfd);
+    return ret;
+}
+
+void* opendirat64(int dirfd, const char* name) {
+    const char* orig_name = name;
+    Intent name_intent = Intent_Read;
+    name = winevfs_get_path(name, name_intent, dirfd);
+    void* ret = winevfs__opendirat64(dirfd, name);
+    free((void*)name);
+    winevfs_add_opendir64(ret, orig_name, dirfd);
+    return ret;
+}
+
+void* __opendirat(int dirfd, const char* name) {
+    const char* orig_name = name;
+    Intent name_intent = Intent_Read;
+    name = winevfs_get_path(name, name_intent, dirfd);
+    void* ret = winevfs____opendirat(dirfd, name);
+    free((void*)name);
+    winevfs_add_opendir(ret, orig_name, dirfd);
+    return ret;
+}
+
+void* __opendirat64(int dirfd, const char* name) {
+    const char* orig_name = name;
+    Intent name_intent = Intent_Read;
+    name = winevfs_get_path(name, name_intent, dirfd);
+    void* ret = winevfs____opendirat64(dirfd, name);
+    free((void*)name);
+    winevfs_add_opendir64(ret, orig_name, dirfd);
     return ret;
 }
 

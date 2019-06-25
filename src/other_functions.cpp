@@ -35,6 +35,7 @@ struct opendir_base_info {
 struct opendir_info {
   struct opendir_base_info info;
   struct dirent* temp;
+  struct dirent64* temp64;
 };
 
 struct opendir_info64 {
@@ -70,12 +71,15 @@ extern "C" {
       return;
 
     info.temp = new dirent;
+    info.temp64 = new dirent64;
 
     std::lock_guard<std::mutex> lock(opendir_mappings_mutex);
     opendir_mappings[dir] = info;
   }
 
   void winevfs_add_opendir64(DIR* dir, char* path, int atfd) {
+    return winevfs_add_opendir(dir, path, atfd);
+
     struct opendir_info64 info;
     if (!winevfs_opendir_fill_info(path, atfd, &info.info))
       return;
@@ -162,24 +166,37 @@ extern "C" {
     }
 
     struct dirent64* entry = (struct dirent64*)winevfs__readdir64((void*)dirp);
+
+    std::lock_guard<std::mutex> lock(opendir_mappings_mutex);
+    auto it = opendir_mappings.find(dirp);
+
     if (entry != NULL) {
+      if (it != opendir_mappings.end()) {
+        std::string name = entry->d_name;
+        it->second.info.already.insert(winevfs_lower(name));
+      }
+
       return entry;
+    }
+
+    if (it == opendir_mappings.end()) {
+      return NULL;
     }
 
     std::string filename;
 
-    std::lock_guard<std::mutex> lock(opendir_mappings_mutex);
-    auto it = opendir64_mappings.find(dirp);
-    if (it == opendir64_mappings.end()) {
-      return NULL;
+    while (true) {
+      if (!get_filename(&it->second.info, &filename))
+        return NULL;
+
+      if (it->second.info.already.find(winevfs_lower(filename)) != it->second.info.already.end())
+        continue;
+
+      strcpy(it->second.temp64->d_name, filename.c_str());
+      //puts(it->second.temp64->d_name);
+
+      return it->second.temp64;
     }
-
-    if (!get_filename(&it->second.info, &filename))
-      return NULL;
-
-    strcpy(it->second.temp->d_name, filename.c_str());
-
-    return it->second.temp;
   }
 
   int closedir(DIR* dirp) {
@@ -189,6 +206,7 @@ extern "C" {
     auto it = opendir_mappings.find(dirp);
     if (it != opendir_mappings.end()) {
       delete it->second.temp;
+      delete it->second.temp64;
       opendir_mappings.erase(it);
     }
 

@@ -130,6 +130,7 @@ std::filesystem::path full_abspath(std::filesystem::path source, int atfd) {
 /*std::string winevfs_readlink_wrapper(const char* path) {
   }*/
 
+#if 0
 static std::filesystem::path simple_readlink(std::filesystem::path source) {
   source = abspath_simple(source);
 
@@ -144,6 +145,7 @@ static std::filesystem::path simple_readlink(std::filesystem::path source) {
 
   return readlinked_path;
 }
+#endif
 
 static std::filesystem::path cached_readlink(std::filesystem::path source) {
   source = abspath_simple(source);
@@ -281,32 +283,29 @@ void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::p
   source = winevfs_abspath(source);
   destination = winevfs_abspath(destination);
 
-  if (fs_isdir(destination)) {
-    DIR* d = fs_opendir(destination);
+  DIR* d = fs_opendir(destination);
+  if (d) {
+    struct dirent* entry;
+    while ((entry = (struct dirent*)winevfs__readdir(d)) != NULL) {
+      if (entry->d_name[0] == '.') {
+        if (entry->d_name[1] == 0)
+          continue;
 
-    if (d) {
-      struct dirent* entry;
-      while ((entry = (struct dirent*)winevfs__readdir(d)) != NULL) {
-        if (entry->d_name[0] == '.') {
-          if (entry->d_name[1] == 0)
-            continue;
-
-          if (entry->d_name[1] == '.' && entry->d_name[2] == 0)
-            continue;
-        }
-
-        std::string out = destination / entry->d_name;
-        std::string path = source / entry->d_name;
-
-        if (fs_isdir(out)) {
-          winevfs_add_read_directory(path, out);
-        } else {
-          _add_read_entry(path, out);
-        }
+        if (entry->d_name[1] == '.' && entry->d_name[2] == 0)
+          continue;
       }
 
-      return;
+      std::string out = destination / entry->d_name;
+      std::string path = source / entry->d_name;
+
+      if (fs_isdir(out)) {
+        winevfs_add_read_directory(path, out);
+      } else {
+        _add_read_entry(path, out);
+      }
     }
+
+    return;
   }
 
   _add_read_entry(source, destination);
@@ -370,21 +369,19 @@ static std::filesystem::path winpath(std::filesystem::path source, int atfd) {
       path_cache[winparent_lower] = winparent;
   }
 
-  if (fs_isdir(winparent)) {
-    DIR* d = fs_opendir(winparent);
+  // No need to check if it's a directory, it will return NULL if it's not
+  DIR* d = fs_opendir(winparent);
+  if (d) {
     struct dirent* entry;
-
-    if (d) {
-      while ((entry = (struct dirent*)winevfs__readdir(d)) != NULL) {
-        std::string filename = entry->d_name;
-        if (lower(filename) == basename_lower) {
-          closedir(d);
-          return winparent / filename;
-        }
+    while ((entry = (struct dirent*)winevfs__readdir(d)) != NULL) {
+      std::string filename = entry->d_name;
+      if (lower(filename) == basename_lower) {
+        closedir(d);
+        return winparent / filename;
       }
-
-      closedir(d);
     }
+
+    closedir(d);
   }
 
   return winparent / basename;
@@ -516,6 +513,9 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent, int atfd) 
   //std::cout << "LOWER: " << path_lower << std::endl;fflush(stdout);
 
   // TODO: Handle Intent_Delete
+  // TODO: Pretend it's case insensitive:
+  //   https://github.com/wine-mirror/wine/blob/ba9f3dc198dfc81bb40159077b73b797006bb73c/dlls/ntdll/directory.c#L1167
+  //   Return 0x65735546 for statfs.f_type and pretend a file named .ciopfs exists
 
   {
     std::lock_guard<std::mutex> lock(read_mappings_mutex);
@@ -531,6 +531,8 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent, int atfd) 
     if (it != winevfs_folder_mappings.end()) {
       std::string win_path = winpath(path, atfd);
       //std::cout << "WINP: " << win_path << std::endl;fflush(stdout);
+
+      // FIXME: this runs stat again, after winpath has already run it
       if (!fs_isdir(win_path))
         return "/tmp/.winevfs_fakedir/";
       else

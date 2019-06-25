@@ -216,12 +216,23 @@ var _functions = [
   },
   {
     ret: "void*",
-    name: "opendir",
+    name: ["opendir", "__opendir"],
     args: [
       ["const char*", "name", "r"]
     ],
     is_opendir: true,
     has_64: true
+  },
+  {
+    ret: "void*",
+    name: ["opendirat", "__opendirat"],
+    args: [
+      ["int", "dirfd"],
+      ["const char*", "name", "r"]
+    ],
+    is_opendir: true,
+    has_64: true,
+    at: "dirfd"
   },
   {
     ret: "int",
@@ -499,8 +510,13 @@ functions.forEach(fn => {
     }
   });
 
+  var at = "AT_FDCWD";
+  if (fn.at) {
+    at = fn.at;
+  }
+
   if (fn.is_opendir) {
-    retstr += "    winevfs_add_" + fn.name + "(ret, orig_name, AT_FDCWD);\n";
+    retstr += "    winevfs_add_" + fn.name.replace(/_/g, "").replace(/at/, "") + "(ret, orig_name, " + at + ");\n";
   }
 
   retstr += "    return ret;\n";
