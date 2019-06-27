@@ -12,7 +12,11 @@ var _functions = [
     has_64: true,
     variadic: [
       ["mode_t", "mode"]
-    ]
+    ],
+    wrap: {
+      func: "winevfs_wrap_open",
+      args: ["pathname"]
+    }
   },
   {
     ret: "int",
@@ -27,6 +31,10 @@ var _functions = [
     variadic: [
       ["mode_t", "mode"]
     ],
+    wrap: {
+      func: "winevfs_wrap_open",
+      args: ["pathname", "dirfd"]
+    },
     at: "dirfd"
   },
   {
@@ -36,6 +44,10 @@ var _functions = [
       ["const char*", "file", "w"],
       ["int", "mode"]
     ],
+    wrap: {
+      func: "winevfs_wrap_open",
+      args: ["file"]
+    },
     has_64: true
   },
   {
@@ -259,7 +271,9 @@ var _functions = [
     name: ["chdir", "__chdir"],
     args: [
       ["const char*", "path", "r"]
-    ]
+    ],
+    origonly: true,
+    //disabled: true // doesn't help
   },
   {
     ret: "int",
@@ -344,6 +358,50 @@ var _functions = [
     ],
     origonly: true,
     has_64: true
+  },
+  {
+    ret: "int",
+    name: ["fchdir", "__fchdir"],
+    args: [
+      ["int", "fd"]
+    ],
+    origonly: true
+  },
+  {
+    ret: "int",
+    name: ["close"],
+    args: [
+      ["int", "fd"]
+    ],
+    origonly: true
+  },
+  {
+    ret: "int",
+    name: ["dup", "__dup"],
+    args: [
+      ["int", "fd"]
+    ],
+    origonly: true
+  },
+  {
+    ret: "ssize_t",
+    name: ["sendmsg"],
+    args: [
+      ["int", "socket"],
+      ["void*", "message"],
+      ["int", "flags"]
+    ],
+    origonly: true
+  },
+  {
+    ret: "ssize_t",
+    name: ["recvmsg"],
+    args: [
+      ["int", "socket"],
+      ["void*", "message"],
+      ["int", "flags"]
+    ],
+    origonly: true
   }
 ];
 
@@ -442,6 +500,7 @@ retstr += "extern void free(void *ptr);";
 retstr += "extern int puts(const char *s);";
 retstr += "extern void winevfs_add_opendir(void* dir, const char* path, int atfd);";
 retstr += "extern void winevfs_add_opendir64(void* dir, const char* path, int atfd);";
+retstr += "extern void winevfs_wrap_open(int fd, const char* path, int atfd=AT_FDCWD);";
 retstr += "extern void fflush(void* stream);";
 retstr += "extern void* stdout;";
 
@@ -466,6 +525,19 @@ functions.forEach(fn => {
 
   if (fn.is_opendir) {
     retstr += "    const char* orig_name = name;\n"
+  }
+
+  if (fn.wrap) {
+    fn.wrap.args.forEach(arg => {
+      var oarg_obj;
+      fn.args.forEach(oarg => {
+        if (oarg[1] === arg) {
+          oarg_obj = oarg;
+        }
+      });
+
+      retstr += "    " + oarg_obj[0] + " orig_" + arg + " = " + arg + ";\n";
+    });
   }
 
   //retstr += "    puts(\"" + fn.name + "\");fflush(stdout);\n";
@@ -509,6 +581,15 @@ functions.forEach(fn => {
       retstr += "    free((void*)" + arg[1] + ");\n";
     }
   });
+
+  if (fn.wrap) {
+    retstr += "    " + fn.wrap.func + "(ret, ";
+    var newargs = [];
+    fn.wrap.args.forEach(arg => {
+      newargs.push("orig_" + arg);
+    });
+    retstr += newargs.join(", ") + ");\n";
+  }
 
   if (fn.is_opendir) {
     var at = "AT_FDCWD";

@@ -86,7 +86,20 @@ void fs_mkdir_p(std::filesystem::path source) {
   }
 }
 
-std::filesystem::path fs_getcwd() {
+static std::string fakecwd;
+static std::mutex fakecwd_mutex;
+void winevfs_setcwd(const char* cwd) {
+  std::lock_guard<std::mutex> lock(fakecwd_mutex);
+  fakecwd = cwd;
+}
+
+static std::filesystem::path fs_getcwd() {
+  {
+    std::lock_guard<std::mutex> lock(fakecwd_mutex);
+    if (fakecwd.size() > 0)
+      return fakecwd;
+  }
+
   char path[PATH_MAX];
   getcwd(path, PATH_MAX - 1);
 
@@ -112,13 +125,21 @@ static std::filesystem::path abspath_simple(std::filesystem::path source) {
   return new_path;
 }
 
-static std::unordered_map<std::string, std::string> readlink_cache;
-static std::mutex readlink_cache_mutex;
+std::unordered_map<int, std::string> winevfs_fd_table;
+std::mutex winevfs_fd_table_mutex;
 
-static std::filesystem::path get_fd_path(int atfd) {
+std::string winevfs_get_fd_path(int atfd) {
   //printf("FD: %i\n", atfd);fflush(stdout);
   if (atfd == AT_FDCWD)
+    // TODO: optimize, make a new function that returns std::string instead of std::filesystem::path
     return fs_getcwd();
+
+  {
+    std::lock_guard<std::mutex> lock(winevfs_fd_table_mutex);
+    auto it = winevfs_fd_table.find(atfd);
+    if (it != winevfs_fd_table.end())
+      return it->second;
+  }
 
   static int pid = getpid();
 
@@ -132,7 +153,11 @@ static std::filesystem::path get_fd_path(int atfd) {
   }
   readlinked[bytes] = 0;
 
-  return std::filesystem::path(readlinked);
+  return std::string(readlinked);
+}
+
+static std::filesystem::path get_fd_path(int atfd) {
+  return winevfs_get_fd_path(atfd);
 }
 
 std::filesystem::path full_abspath(std::filesystem::path source, int atfd) {
@@ -164,6 +189,9 @@ static std::filesystem::path simple_readlink(std::filesystem::path source) {
   return readlinked_path;
 }
 #endif
+
+static std::unordered_map<std::string, std::string> readlink_cache;
+static std::mutex readlink_cache_mutex;
 
 static std::filesystem::path cached_readlink(std::filesystem::path source) {
   source = abspath_simple(source);
@@ -323,6 +351,8 @@ void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::p
       }
     }
 
+    winevfs__closedir(d);
+
     return;
   }
 
@@ -394,19 +424,25 @@ static std::filesystem::path winpath(std::filesystem::path source, int atfd) {
     while ((entry = (struct dirent*)winevfs__readdir(d)) != NULL) {
       std::string filename = entry->d_name;
       if (lower(filename) == basename_lower) {
-        closedir(d);
+        winevfs__closedir(d);
         return winparent / filename;
       }
     }
 
-    closedir(d);
+    winevfs__closedir(d);
   }
 
   return winparent / basename;
 }
 
+std::string winevfs_winpath(std::string source, int atfd) {
+  return winpath(source, atfd);
+}
+
 void winevfs_read_vfsfile(char* envfile) {
   FILE* fp = (FILE*)winevfs__fopen(envfile, "r");
+  if (!fp)
+    return;
 
   ssize_t read;
   size_t len = 0;
@@ -507,14 +543,15 @@ void winevfs_init() {
   if (inited)
     return;
 
+  // TODO: empty this directory
+  fs_mkdir_p("/tmp/.winevfs/fakedir/");
+
   char* envfile = getenv("WINEVFS_VFSFILE");
   if (!envfile || !envfile[0])
     return;
 
   winevfs_read_vfsfile(envfile);
 
-  // TODO: empty this directory
-  fs_mkdir_p("/tmp/.winevfs_fakedir/");
   inited = true;
 }
 
@@ -534,6 +571,8 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent, int atfd) 
   // TODO: Pretend it's case insensitive:
   //   https://github.com/wine-mirror/wine/blob/ba9f3dc198dfc81bb40159077b73b797006bb73c/dlls/ntdll/directory.c#L1167
   //   Return 0x65735546 for statfs.f_type and pretend a file named .ciopfs exists
+  // TODO: If we're being called by stat(), send cached value if possible instead of
+  //   falling through to another stat after this.
 
   {
     std::lock_guard<std::mutex> lock(read_mappings_mutex);
@@ -551,7 +590,7 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent, int atfd) 
       //std::cout << "WINP: " << win_path << std::endl;fflush(stdout);
 
       if (!fs_isdir(win_path, true))
-        return "/tmp/.winevfs_fakedir/";
+        return "/tmp/.winevfs/fakedir/";
       else
         return win_path;
     }

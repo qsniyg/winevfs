@@ -63,4 +63,11 @@ int winevfs__removexattr(const char* path, const char* name);
 int winevfs__closedir(void* dir);
 void* winevfs__readdir(void* dir);
 void* winevfs__readdir64(void* dir);
+int winevfs__fchdir(int fd);
+int winevfs____fchdir(int fd);
+int winevfs__close(int fd);
+int winevfs__dup(int fd);
+int winevfs____dup(int fd);
+ssize_t winevfs__sendmsg(int socket, void* message, int flags);
+ssize_t winevfs__recvmsg(int socket, void* message, int flags);
 }

@@ -5,7 +5,7 @@
 extern "C" {
 extern void* dlsym (void* handle, const char* name);
 
-extern void free(void *ptr);extern int puts(const char *s);extern void winevfs_add_opendir(void* dir, const char* path, int atfd);extern void winevfs_add_opendir64(void* dir, const char* path, int atfd);extern void fflush(void* stream);extern void* stdout;int winevfs__open(const char* pathname, int flags, mode_t mode) {
+extern void free(void *ptr);extern int puts(const char *s);extern void winevfs_add_opendir(void* dir, const char* path, int atfd);extern void winevfs_add_opendir64(void* dir, const char* path, int atfd);extern void winevfs_wrap_open(int fd, const char* path, int atfd=AT_FDCWD);extern void fflush(void* stream);extern void* stdout;int winevfs__open(const char* pathname, int flags, mode_t mode) {
     static int (*original)(const char*, int, ...) = (int (*)(const char*, int, ...))dlsym(RTLD_NEXT, "open");
     return original(pathname, flags, mode);
 }
@@ -325,9 +325,45 @@ void* winevfs__readdir64(void* dir) {
     return original(dir);
 }
 
+int winevfs__fchdir(int fd) {
+    static int (*original)(int) = (int (*)(int))dlsym(RTLD_NEXT, "fchdir");
+    return original(fd);
+}
+
+int winevfs____fchdir(int fd) {
+    static int (*original)(int) = (int (*)(int))dlsym(RTLD_NEXT, "__fchdir");
+    return original(fd);
+}
+
+int winevfs__close(int fd) {
+    static int (*original)(int) = (int (*)(int))dlsym(RTLD_NEXT, "close");
+    return original(fd);
+}
+
+int winevfs__dup(int fd) {
+    static int (*original)(int) = (int (*)(int))dlsym(RTLD_NEXT, "dup");
+    return original(fd);
+}
+
+int winevfs____dup(int fd) {
+    static int (*original)(int) = (int (*)(int))dlsym(RTLD_NEXT, "__dup");
+    return original(fd);
+}
+
+ssize_t winevfs__sendmsg(int socket, void* message, int flags) {
+    static ssize_t (*original)(int, void*, int) = (ssize_t (*)(int, void*, int))dlsym(RTLD_NEXT, "sendmsg");
+    return original(socket, message, flags);
+}
+
+ssize_t winevfs__recvmsg(int socket, void* message, int flags) {
+    static ssize_t (*original)(int, void*, int) = (ssize_t (*)(int, void*, int))dlsym(RTLD_NEXT, "recvmsg");
+    return original(socket, message, flags);
+}
+
 
 
 int winevfs_variadic__open(const char* pathname, int flags, mode_t mode) {
+    const char* orig_pathname = pathname;
     Intent pathname_intent = Intent_Read;
     if (flags & O_CREAT) {
         pathname_intent = Intent_Create;
@@ -335,10 +371,12 @@ int winevfs_variadic__open(const char* pathname, int flags, mode_t mode) {
     pathname = winevfs_get_path(pathname, pathname_intent, AT_FDCWD);
     int ret = winevfs__open(pathname, flags, mode);
     free((void*)pathname);
+    winevfs_wrap_open(ret, orig_pathname);
     return ret;
 }
 
 int winevfs_variadic__open64(const char* pathname, int flags, mode_t mode) {
+    const char* orig_pathname = pathname;
     Intent pathname_intent = Intent_Read;
     if (flags & O_CREAT) {
         pathname_intent = Intent_Create;
@@ -346,10 +384,13 @@ int winevfs_variadic__open64(const char* pathname, int flags, mode_t mode) {
     pathname = winevfs_get_path(pathname, pathname_intent, AT_FDCWD);
     int ret = winevfs__open64(pathname, flags, mode);
     free((void*)pathname);
+    winevfs_wrap_open(ret, orig_pathname);
     return ret;
 }
 
 int winevfs_variadic__openat(int dirfd, const char* pathname, int flags, mode_t mode) {
+    const char* orig_pathname = pathname;
+    int orig_dirfd = dirfd;
     Intent pathname_intent = Intent_Read;
     if (flags & O_CREAT) {
         pathname_intent = Intent_Create;
@@ -357,10 +398,13 @@ int winevfs_variadic__openat(int dirfd, const char* pathname, int flags, mode_t 
     pathname = winevfs_get_path(pathname, pathname_intent, dirfd);
     int ret = winevfs__openat(dirfd, pathname, flags, mode);
     free((void*)pathname);
+    winevfs_wrap_open(ret, orig_pathname, orig_dirfd);
     return ret;
 }
 
 int winevfs_variadic__openat64(int dirfd, const char* pathname, int flags, mode_t mode) {
+    const char* orig_pathname = pathname;
+    int orig_dirfd = dirfd;
     Intent pathname_intent = Intent_Read;
     if (flags & O_CREAT) {
         pathname_intent = Intent_Create;
@@ -368,24 +412,29 @@ int winevfs_variadic__openat64(int dirfd, const char* pathname, int flags, mode_
     pathname = winevfs_get_path(pathname, pathname_intent, dirfd);
     int ret = winevfs__openat64(dirfd, pathname, flags, mode);
     free((void*)pathname);
+    winevfs_wrap_open(ret, orig_pathname, orig_dirfd);
     return ret;
 }
 
 int creat(const char* file, int mode) {
+    const char* orig_file = file;
     Intent file_intent = Intent_Read;
     file_intent = Intent_Create;
     file = winevfs_get_path(file, file_intent, AT_FDCWD);
     int ret = winevfs__creat(file, mode);
     free((void*)file);
+    winevfs_wrap_open(ret, orig_file);
     return ret;
 }
 
 int creat64(const char* file, int mode) {
+    const char* orig_file = file;
     Intent file_intent = Intent_Read;
     file_intent = Intent_Create;
     file = winevfs_get_path(file, file_intent, AT_FDCWD);
     int ret = winevfs__creat64(file, mode);
     free((void*)file);
+    winevfs_wrap_open(ret, orig_file);
     return ret;
 }
 
@@ -781,22 +830,6 @@ ssize_t readlink(const char* path, char* buf, size_t bufsiz) {
     Intent path_intent = Intent_Read;
     path = winevfs_get_path(path, path_intent, AT_FDCWD);
     ssize_t ret = winevfs__readlink(path, buf, bufsiz);
-    free((void*)path);
-    return ret;
-}
-
-int chdir(const char* path) {
-    Intent path_intent = Intent_Read;
-    path = winevfs_get_path(path, path_intent, AT_FDCWD);
-    int ret = winevfs__chdir(path);
-    free((void*)path);
-    return ret;
-}
-
-int __chdir(const char* path) {
-    Intent path_intent = Intent_Read;
-    path = winevfs_get_path(path, path_intent, AT_FDCWD);
-    int ret = winevfs____chdir(path);
     free((void*)path);
     return ret;
 }

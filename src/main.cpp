@@ -18,8 +18,8 @@ int main(int argc, char** argv) {
   puts("[winevfs] Loading VFS file");
   winevfs_init();
   puts("[winevfs] Writing VFS file");
-  winevfs_write_vfsfile("/tmp/.winevfs");
-  setenv("WINEVFS_VFSFILE", "/tmp/.winevfs", true);
+  winevfs_write_vfsfile("/tmp/.winevfs/vfsinfo");
+  setenv("WINEVFS_VFSFILE", "/tmp/.winevfs/vfsinfo", true);
 
   char self_path[PATH_MAX];
   self_path[0] = 0;

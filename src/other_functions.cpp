@@ -11,7 +11,10 @@
 //#include <dirent.h>
 #include <features.h>
 #include <bits/types.h>
+#include <bits/types/struct_iovec.h>
 #include <bits/dirent.h>
+#define _SYS_SOCKET_H
+#include <bits/socket.h>
 #include <dlfcn.h>
 #include "vfs_types.hpp"
 #include "vfs_minimal.hpp"
@@ -19,11 +22,20 @@
 
 //extern char** environ;
 
-struct DIR;
+struct DIR {
+  int fd;
+  // a bunch of other stuff as well
+};
 
 extern std::unordered_map<std::string, unique_vector> winevfs_folder_mappings;
 extern std::mutex winevfs_folder_mappings_mutex;
 std::string winevfs_abspath(std::string source, int atfd=AT_FDCWD);
+std::string winevfs_winpath(std::string source, int atfd);
+std::string winevfs_get_fd_path(int atfd);
+void winevfs_setcwd(const char* cwd);
+
+extern std::unordered_map<int, std::string> winevfs_fd_table;
+extern std::mutex winevfs_fd_table_mutex;
 
 struct opendir_base_info {
   std::string path;
@@ -64,17 +76,38 @@ static bool winevfs_opendir_fill_info(char* path, int atfd, opendir_base_info* i
   return true;
 }
 
+static void add_path_to_fdtable(int fd, std::string string_path, int atfd) {
+  if (fd <= 0)
+    return;
+
+  std::lock_guard<std::mutex> lock(winevfs_fd_table_mutex);
+  winevfs_fd_table[fd] = string_path;
+  //printf("open wrap: %s (%i)\n", string_path.c_str(), fd);fflush(stdout);
+}
+
 extern "C" {
+  void winevfs_wrap_open(int fd, char* path, int atfd) {
+    std::string string_path = winevfs_abspath(std::string(path), atfd);
+    add_path_to_fdtable(fd, string_path, atfd);
+  }
+
   void winevfs_add_opendir(DIR* dir, char* path, int atfd) {
-    struct opendir_info info;
-    if (!winevfs_opendir_fill_info(path, atfd, &info.info))
+    if (!dir) {
       return;
+    }
+
+    struct opendir_info info;
+    winevfs_opendir_fill_info(path, atfd, &info.info);
+    /*if (!winevfs_opendir_fill_info(path, atfd, &info.info))
+      return;*/
 
     info.temp = new dirent;
     info.temp64 = new dirent64;
 
     std::lock_guard<std::mutex> lock(opendir_mappings_mutex);
     opendir_mappings[dir] = info;
+
+    add_path_to_fdtable(dir->fd, info.info.path, atfd);
   }
 
   void winevfs_add_opendir64(DIR* dir, char* path, int atfd) {
@@ -136,6 +169,8 @@ extern "C" {
         it->second.info.already.insert(winevfs_lower(name));
       }
 
+      puts(entry->d_name);fflush(stdout);
+
       return entry;
     }
 
@@ -153,7 +188,7 @@ extern "C" {
         continue;
 
       strcpy(it->second.temp->d_name, filename.c_str());
-      //puts(it->second.temp->d_name);
+      puts(it->second.temp->d_name);fflush(stdout);
 
       return it->second.temp;
     }
@@ -176,6 +211,8 @@ extern "C" {
         it->second.info.already.insert(winevfs_lower(name));
       }
 
+      puts(entry->d_name);fflush(stdout);
+
       return entry;
     }
 
@@ -193,7 +230,7 @@ extern "C" {
         continue;
 
       strcpy(it->second.temp64->d_name, filename.c_str());
-      //puts(it->second.temp64->d_name);
+      puts(it->second.temp64->d_name);fflush(stdout);
 
       return it->second.temp64;
     }
@@ -205,9 +242,12 @@ extern "C" {
 
     auto it = opendir_mappings.find(dirp);
     if (it != opendir_mappings.end()) {
+      //printf("closedir: %s\n", it->second.info.path.c_str());fflush(stdout);
       delete it->second.temp;
       delete it->second.temp64;
       opendir_mappings.erase(it);
+    } else {
+      //puts("closedir out of mappings");fflush(stdout);
     }
 
     auto it64 = opendir64_mappings.find(dirp);
@@ -216,6 +256,182 @@ extern "C" {
       opendir64_mappings.erase(it64);
     }
 
+    if (dirp) {
+      std::lock_guard<std::mutex> fd_lock(winevfs_fd_table_mutex);
+      winevfs_fd_table.erase(dirp->fd);
+    }
+
     return winevfs__closedir((void*)dirp);
+  }
+
+  // FIXME: write a proper implementation, tracking the "real" CWD, probably as a wrap
+  static int winevfs_chdir(const char* path) {
+    winevfs_setcwd(path);
+    //printf("chdir %s\n", path);fflush(stdout);
+    int ret = winevfs__chdir(path);
+    if (ret < 0)
+      return winevfs__chdir("/tmp/.winevfs/fakedir");
+    return ret;
+  }
+
+  int chdir(const char* path) {
+    return winevfs_chdir(path);
+  }
+
+  int fchdir(int fd) {
+    //printf("fchdir %i\n", fd);fflush(stdout);
+    // TODO: check if in mappings, if not, winevfs__fchdir
+    std::string newpath = winevfs_get_fd_path(fd);
+    //printf("fchdir: %s\n", newpath.c_str());fflush(stdout);
+    return winevfs_chdir(newpath.c_str());
+  }
+
+  int close(int fd) {
+    //printf("close %i\n", fd);fflush(stdout);
+    std::lock_guard<std::mutex> lock(winevfs_fd_table_mutex);
+    if (false) {
+      auto it = winevfs_fd_table.find(fd);
+      if (it != winevfs_fd_table.end()) {
+        printf("close: %s\n", it->second.c_str());fflush(stdout);
+      } else {
+        puts("close out of mappings");fflush(stdout);
+      }
+    }
+    winevfs_fd_table.erase(fd);
+
+    return winevfs__close(fd);
+  }
+
+  int dup(int fd) {
+    //puts("dup");fflush(stdout);
+    int newfd = winevfs__dup(fd);
+    //printf("dup: %i -> %i\n", fd, newfd);fflush(stdout);
+    std::lock_guard<std::mutex> lock(winevfs_fd_table_mutex);
+    auto it = winevfs_fd_table.find(fd);
+    if (it != winevfs_fd_table.end())
+      winevfs_fd_table[newfd] = it->second;
+
+    return newfd;
+  }
+
+  static bool is_possible_fd(struct msghdr* message) {
+    return message &&
+      message->msg_name == NULL &&
+      message->msg_iovlen == 1 &&
+      message->msg_iov &&
+      // either obj_handle_t (unsigned int) or send_fd (int + unsigned int)
+      // this check is needed, because otherwise it will crash Xlib (4096, returning >5000 due to origpath)
+      (message->msg_iov[0].iov_len == 4 || message->msg_iov[0].iov_len == 8) &&
+      message->msg_control &&
+      message->msg_flags == 0;
+  }
+
+  int getpid(void);
+
+  ssize_t sendmsg(int socket, struct msghdr* message, int flags) {
+    struct iovec* vec = NULL;
+    ssize_t sizeoffset = 0;
+    std::string orig_filename;
+
+    if (is_possible_fd(message)) {
+      int fd = -1;
+
+      struct cmsghdr* cmsg = CMSG_FIRSTHDR(message);
+      if (cmsg &&
+          cmsg->cmsg_level == SOL_SOCKET &&
+          cmsg->cmsg_type == SCM_RIGHTS &&
+          cmsg->cmsg_len == CMSG_LEN(sizeof(int))) {
+
+        //puts("sendmsg");fflush(stdout);
+
+        fd = *CMSG_DATA(cmsg);
+
+        {
+          std::lock_guard<std::mutex> lock(winevfs_fd_table_mutex);
+          auto it = winevfs_fd_table.find(fd);
+          if (it != winevfs_fd_table.end())
+            orig_filename = it->second;
+        }
+      }
+
+      // Should always happen because if not recvmsg could shrink iov without the extra data
+      if (true || orig_filename.size() > 0) {
+        //printf("[%i] Sending fd: %i = %s (%i)\n", getpid(), fd, orig_filename.c_str(), orig_filename.size());fflush(stdout);
+        vec = (struct iovec*)malloc(sizeof(struct iovec) * (message->msg_iovlen + 1));
+        memcpy(vec, message->msg_iov, sizeof(struct iovec) * message->msg_iovlen);
+        vec[message->msg_iovlen].iov_base = (void*)orig_filename.c_str();
+        vec[message->msg_iovlen].iov_len = orig_filename.size() + 1;
+
+        sizeoffset = vec[message->msg_iovlen].iov_len;
+        message->msg_iov = vec;
+        message->msg_iovlen++;
+      }
+    }
+
+    ssize_t ret = winevfs__sendmsg(socket, (void*)message, flags);
+    free(vec);
+    ret -= sizeoffset;
+    return ret;
+  }
+
+  ssize_t recvmsg(int socket, struct msghdr* message, int flags) {
+    bool possibly_fd = false;
+    struct iovec* orig_vec = NULL;
+
+    char origpath[4096];
+    origpath[0] = 0;
+
+    int orig_len = 0;
+
+    if (is_possible_fd(message)) {
+      possibly_fd = true;
+
+      orig_vec = message->msg_iov;
+      orig_len = message->msg_iov[0].iov_len;
+
+      struct iovec* vec = (struct iovec*)malloc(sizeof(struct iovec) * (message->msg_iovlen + 1));
+      memcpy(vec, message->msg_iov, sizeof(struct iovec) * message->msg_iovlen);
+      vec[message->msg_iovlen].iov_base = &origpath;
+      vec[message->msg_iovlen].iov_len = sizeof(origpath);
+      message->msg_iovlen++;
+      message->msg_iov = vec;
+    }
+
+    ssize_t ret = winevfs__recvmsg(socket, (void*)message, flags);
+
+    if (possibly_fd && ret != orig_len) {
+      //puts("recvmsg");fflush(stdout);
+      int fd = -1;
+
+      if (ret > 0) {
+        struct cmsghdr* cmsg;
+        for (cmsg = CMSG_FIRSTHDR(message); cmsg; cmsg = CMSG_NXTHDR(message, cmsg)) {
+          if (cmsg->cmsg_level != SOL_SOCKET)
+            continue;
+
+          if (cmsg->cmsg_type == SCM_RIGHTS && cmsg->cmsg_len == CMSG_LEN(sizeof(int)))
+            fd = *(int*)CMSG_DATA(cmsg);
+        }
+      }
+
+      std::string origfile = (char*)message->msg_iov[message->msg_iovlen - 1].iov_base;
+      ret -= origfile.size() + 1;
+
+      if (fd >= 0) {
+        //printf("[%i] Received fd: %i = %s\n", getpid(), fd, origfile.c_str());fflush(stdout);
+
+        if (origfile.size() > 0) {
+          std::lock_guard<std::mutex> lock(winevfs_fd_table_mutex);
+          winevfs_fd_table[fd] = origfile;
+        }
+      }
+
+      message->msg_iovlen--;
+      memcpy(orig_vec, message->msg_iov, sizeof(struct iovec) * message->msg_iovlen);
+      free(message->msg_iov);
+      message->msg_iov = orig_vec;
+    }
+
+    return ret;
   }
 }
