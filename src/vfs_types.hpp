@@ -4,6 +4,7 @@
 #include <vector>
 
 struct unique_vector {
+  std::string folderpath;
   std::unordered_set<std::string> set;
   std::vector<std::string> vector;
 

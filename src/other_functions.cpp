@@ -28,6 +28,7 @@ struct DIR {
 };
 
 extern std::unordered_map<std::string, unique_vector> winevfs_folder_mappings;
+extern std::unordered_map<std::string, std::string> winevfs_reverse_folder_mappings;
 extern std::mutex winevfs_folder_mappings_mutex;
 std::string winevfs_abspath(std::string source, int atfd=AT_FDCWD);
 std::string winevfs_winpath(std::string source, int atfd);
@@ -64,13 +65,21 @@ static bool winevfs_opendir_fill_info(char* path, int atfd, opendir_base_info* i
   std::string string_path = winevfs_abspath(std::string(path), atfd);
   info->path = winevfs_lower(string_path);
 
+  puts(info->path.c_str());
+
   info->finished = false;
   info->position = 0;
 
   std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
   auto it = winevfs_folder_mappings.find(info->path);
   if (it == winevfs_folder_mappings.end()) {
-    return false;
+    info->path = winevfs_reverse_folder_mappings[info->path];
+    puts(info->path.c_str());
+
+    it = winevfs_folder_mappings.find(info->path);
+    if (it == winevfs_folder_mappings.end()) {
+      return false;
+    }
   }
 
   return true;
@@ -82,7 +91,7 @@ static void add_path_to_fdtable(int fd, std::string string_path, int atfd) {
 
   std::lock_guard<std::mutex> lock(winevfs_fd_table_mutex);
   winevfs_fd_table[fd] = string_path;
-  //printf("open wrap: %s (%i)\n", string_path.c_str(), fd);fflush(stdout);
+  printf("open wrap: %s (%i)\n", string_path.c_str(), fd);fflush(stdout);
 }
 
 extern "C" {
@@ -98,8 +107,8 @@ extern "C" {
 
     struct opendir_info info;
     winevfs_opendir_fill_info(path, atfd, &info.info);
-    /*if (!winevfs_opendir_fill_info(path, atfd, &info.info))
-      return;*/
+    if (!winevfs_opendir_fill_info(path, atfd, &info.info))
+      return;
 
     info.temp = new dirent;
     info.temp64 = new dirent64;
@@ -107,7 +116,7 @@ extern "C" {
     std::lock_guard<std::mutex> lock(opendir_mappings_mutex);
     opendir_mappings[dir] = info;
 
-    add_path_to_fdtable(dir->fd, info.info.path, atfd);
+    //add_path_to_fdtable(dir->fd, info.info.path, atfd);
   }
 
   void winevfs_add_opendir64(DIR* dir, char* path, int atfd) {
@@ -157,7 +166,7 @@ extern "C" {
     return execve(path, argv, environ);
     }*/
   struct dirent* readdir(DIR* dirp) {
-    //puts("readdir");
+    puts("readdir");
     struct dirent* entry = (struct dirent*)winevfs__readdir((void*)dirp);
 
     std::lock_guard<std::mutex> lock(opendir_mappings_mutex);
@@ -211,7 +220,7 @@ extern "C" {
         it->second.info.already.insert(winevfs_lower(name));
       }
 
-      puts(entry->d_name);fflush(stdout);
+      //puts(entry->d_name);fflush(stdout);
 
       return entry;
     }
@@ -237,17 +246,17 @@ extern "C" {
   }
 
   int closedir(DIR* dirp) {
-    //puts("closedir");
+    puts("closedir");
     std::lock_guard<std::mutex> lock(opendir_mappings_mutex);
 
     auto it = opendir_mappings.find(dirp);
     if (it != opendir_mappings.end()) {
-      //printf("closedir: %s\n", it->second.info.path.c_str());fflush(stdout);
+      printf("closedir: %s\n", it->second.info.path.c_str());fflush(stdout);
       delete it->second.temp;
       delete it->second.temp64;
       opendir_mappings.erase(it);
     } else {
-      //puts("closedir out of mappings");fflush(stdout);
+      puts("closedir out of mappings");fflush(stdout);
     }
 
     auto it64 = opendir64_mappings.find(dirp);
@@ -256,7 +265,7 @@ extern "C" {
       opendir64_mappings.erase(it64);
     }
 
-    if (dirp) {
+    if (false && dirp) {
       std::lock_guard<std::mutex> fd_lock(winevfs_fd_table_mutex);
       winevfs_fd_table.erase(dirp->fd);
     }
@@ -267,7 +276,7 @@ extern "C" {
   // FIXME: write a proper implementation, tracking the "real" CWD, probably as a wrap
   static int winevfs_chdir(const char* path) {
     winevfs_setcwd(path);
-    //printf("chdir %s\n", path);fflush(stdout);
+    printf("chdir %s\n", path);fflush(stdout);
     int ret = winevfs__chdir(path);
     if (ret < 0)
       return winevfs__chdir("/tmp/.winevfs/fakedir");
@@ -278,11 +287,11 @@ extern "C" {
     return winevfs_chdir(path);
   }
 
-  int fchdir(int fd) {
-    //printf("fchdir %i\n", fd);fflush(stdout);
+  int fchdir1(int fd) {
+    printf("fchdir %i\n", fd);fflush(stdout);
     // TODO: check if in mappings, if not, winevfs__fchdir
     std::string newpath = winevfs_get_fd_path(fd);
-    //printf("fchdir: %s\n", newpath.c_str());fflush(stdout);
+    printf("fchdir: %s\n", newpath.c_str());fflush(stdout);
     return winevfs_chdir(newpath.c_str());
   }
 
@@ -328,7 +337,7 @@ extern "C" {
 
   int getpid(void);
 
-  ssize_t sendmsg(int socket, struct msghdr* message, int flags) {
+  ssize_t send1msg(int socket, struct msghdr* message, int flags) {
     struct iovec* vec = NULL;
     ssize_t sizeoffset = 0;
     std::string orig_filename;
@@ -374,7 +383,7 @@ extern "C" {
     return ret;
   }
 
-  ssize_t recvmsg(int socket, struct msghdr* message, int flags) {
+  ssize_t recv1msg(int socket, struct msghdr* message, int flags) {
     bool possibly_fd = false;
     struct iovec* orig_vec = NULL;
 
@@ -418,7 +427,7 @@ extern "C" {
       ret -= origfile.size() + 1;
 
       if (fd >= 0) {
-        //printf("[%i] Received fd: %i = %s\n", getpid(), fd, origfile.c_str());fflush(stdout);
+        printf("[%i] Received fd: %i = %s\n", getpid(), fd, origfile.c_str());fflush(stdout);
 
         if (origfile.size() > 0) {
           std::lock_guard<std::mutex> lock(winevfs_fd_table_mutex);
