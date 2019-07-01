@@ -30,9 +30,7 @@ static int real_stat(const char* str, struct stat* buf) {
 
 static std::unordered_map<std::string, struct stat> stat_cache;
 static std::mutex stat_cache_mutex;
-static int fs_stat(std::filesystem::path path, struct stat* buf, bool use_cache = false) {
-  std::string path_str = path;
-
+int winevfs_stat(std::string path_str, struct stat* buf, bool use_cache = false) {
   if (use_cache) {
     std::lock_guard<std::mutex> lock(stat_cache_mutex);
     auto it = stat_cache.find(path_str);
@@ -49,6 +47,10 @@ static int fs_stat(std::filesystem::path path, struct stat* buf, bool use_cache 
   }
 
   return ret;
+}
+
+int fs_stat(std::filesystem::path path, struct stat* buf, bool use_cache = false) {
+  return winevfs_stat(path, buf, use_cache);
 }
 
 static bool fs_exists(std::filesystem::path source, bool use_cache = false) {
@@ -101,7 +103,7 @@ void winevfs_setcwd(const char* cwd) {
 }
 
 static std::filesystem::path fs_getcwd() {
-  {
+  if (false) {
     std::lock_guard<std::mutex> lock(fakecwd_mutex);
     if (fakecwd.size() > 0) {
       //printf("FAKECWD: %s\n", fakecwd.c_str());fflush(stdout);
@@ -640,6 +642,11 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent, int atfd) 
 
   //std::cout << in << std::endl;
   std::filesystem::path path = winevfs_abspath(in, atfd);
+
+  if (path.filename() == ".ciopfs") {
+    return "/dev/null";
+  }
+
   std::string path_str = path;
   //std::cout << path << std::endl;
   std::string path_lower = lower(path_str);

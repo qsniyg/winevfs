@@ -360,6 +360,16 @@ ssize_t winevfs__recvmsg(int socket, void* message, int flags) {
     return original(socket, message, flags);
 }
 
+int winevfs__statfs(const char* file, struct statfs* buf) {
+    static int (*original)(const char*, struct statfs*) = (int (*)(const char*, struct statfs*))dlsym(RTLD_NEXT, "statfs");
+    return original(file, buf);
+}
+
+int winevfs____statfs(const char* file, struct statfs* buf) {
+    static int (*original)(const char*, struct statfs*) = (int (*)(const char*, struct statfs*))dlsym(RTLD_NEXT, "__statfs");
+    return original(file, buf);
+}
+
 
 
 int winevfs_variadic__open(const char* pathname, int flags, mode_t mode) {
@@ -479,38 +489,6 @@ void* freopen64(const char* pathname, const char* mode, void* stream) {
     pathname = winevfs_get_path(pathname, pathname_intent, AT_FDCWD);
     void* ret = winevfs__freopen64(pathname, mode, stream);
     free((void*)pathname);
-    return ret;
-}
-
-int stat(int ver, const char* path, struct stat* buf) {
-    Intent path_intent = Intent_Read;
-    path = winevfs_get_path(path, path_intent, AT_FDCWD);
-    int ret = winevfs__stat(ver, path, buf);
-    free((void*)path);
-    return ret;
-}
-
-int stat64(int ver, const char* path, struct stat* buf) {
-    Intent path_intent = Intent_Read;
-    path = winevfs_get_path(path, path_intent, AT_FDCWD);
-    int ret = winevfs__stat64(ver, path, buf);
-    free((void*)path);
-    return ret;
-}
-
-int __xstat(int ver, const char* path, struct stat* buf) {
-    Intent path_intent = Intent_Read;
-    path = winevfs_get_path(path, path_intent, AT_FDCWD);
-    int ret = winevfs____xstat(ver, path, buf);
-    free((void*)path);
-    return ret;
-}
-
-int __xstat64(int ver, const char* path, struct stat* buf) {
-    Intent path_intent = Intent_Read;
-    path = winevfs_get_path(path, path_intent, AT_FDCWD);
-    int ret = winevfs____xstat64(ver, path, buf);
-    free((void*)path);
     return ret;
 }
 

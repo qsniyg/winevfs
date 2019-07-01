@@ -70,4 +70,6 @@ int winevfs__dup(int fd);
 int winevfs____dup(int fd);
 ssize_t winevfs__sendmsg(int socket, void* message, int flags);
 ssize_t winevfs__recvmsg(int socket, void* message, int flags);
+int winevfs__statfs(const char* file, struct statfs* buf);
+int winevfs____statfs(const char* file, struct statfs* buf);
 }

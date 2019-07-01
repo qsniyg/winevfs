@@ -15,6 +15,10 @@
 #include <bits/dirent.h>
 #define _SYS_SOCKET_H
 #include <bits/socket.h>
+#define _FCNTL_H
+#define _SYS_STAT_H
+#define _SYS_STATFS_H
+#include <bits/statfs.h>
 #include <dlfcn.h>
 #include "vfs_types.hpp"
 #include "vfs_minimal.hpp"
@@ -34,6 +38,7 @@ std::string winevfs_abspath(std::string source, int atfd=AT_FDCWD);
 std::string winevfs_winpath(std::string source, int atfd);
 std::string winevfs_get_fd_path(int atfd);
 void winevfs_setcwd(const char* cwd);
+int winevfs_stat(std::string path_str, struct stat* buf, bool use_cache = false);
 
 extern std::unordered_map<int, std::string> winevfs_fd_table;
 extern std::mutex winevfs_fd_table_mutex;
@@ -275,7 +280,7 @@ extern "C" {
 
   // FIXME: write a proper implementation, tracking the "real" CWD, probably as a wrap
   static int winevfs_chdir(const char* path) {
-    winevfs_setcwd(path);
+    //winevfs_setcwd(path);
     //printf("chdir %s\n", path);fflush(stdout);
     int ret = winevfs__chdir(path);
     if (ret < 0)
@@ -321,6 +326,37 @@ extern "C" {
       winevfs_fd_table[newfd] = it->second;
 
     return newfd;
+  }
+
+  int __xstat(int ver, const char* path, struct stat* buf) {
+    path = winevfs_get_path(path, Intent_Read, AT_FDCWD);
+    int ret = winevfs_stat(path, buf, true);
+    free((void*)path);
+    return ret;
+  }
+
+  int stat(const char* path, struct stat* buf) {
+    return __xstat(3, path, buf);
+  }
+
+  int __statfs(const char* file, struct statfs* buf) {
+    //puts("__statfs");fflush(stdout);
+    file = winevfs_get_path(file, Intent_Read, AT_FDCWD);
+    int ret = winevfs____statfs(file, buf);
+    free((void*)file);
+
+    buf->f_type = 0x65735546;
+    return ret;
+  }
+
+  int statfs(const char* file, struct statfs* buf) {
+    //puts("statfs");fflush(stdout);
+    file = winevfs_get_path(file, Intent_Read, AT_FDCWD);
+    int ret = winevfs__statfs(file, buf);
+    free((void*)file);
+
+    buf->f_type = 0x65735546;
+    return ret;
   }
 
   static bool is_possible_fd(struct msghdr* message) {

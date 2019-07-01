@@ -77,7 +77,8 @@ var _functions = [
       ["const char*", "path", "r"],
       ["struct stat*", "buf"]
     ],
-    has_64: true
+    has_64: true,
+    origonly: true
   },
   {
     ret: "int",
@@ -400,6 +401,15 @@ var _functions = [
       ["int", "socket"],
       ["void*", "message"],
       ["int", "flags"]
+    ],
+    origonly: true
+  },
+  {
+    ret: "int",
+    name: ["statfs", "__statfs"],
+    args: [
+      ["const char*", "file"],
+      ["struct statfs*", "buf"]
     ],
     origonly: true
   }
