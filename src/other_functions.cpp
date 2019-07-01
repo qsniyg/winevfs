@@ -288,9 +288,9 @@ extern "C" {
     return ret;
   }
 
-  int chdir(const char* path) {
+  /*int chdir(const char* path) {
     return winevfs_chdir(path);
-  }
+    }*/
 
   int fchdir1(int fd) {
     //printf("fchdir %i\n", fd);fflush(stdout);

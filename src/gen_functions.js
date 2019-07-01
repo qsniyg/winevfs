@@ -77,8 +77,16 @@ var _functions = [
       ["const char*", "path", "r"],
       ["struct stat*", "buf"]
     ],
-    has_64: true,
     origonly: true
+  },
+  {
+    ret: "int",
+    name: ["stat64", "__xstat64"],
+    args: [
+      ["int", "ver"],
+      ["const char*", "path", "r"],
+      ["struct stat*", "buf"]
+    ],
   },
   {
     ret: "int",

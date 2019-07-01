@@ -60,13 +60,13 @@ int winevfs__stat(int ver, const char* path, struct stat* buf) {
     return original(ver, path, buf);
 }
 
-int winevfs__stat64(int ver, const char* path, struct stat* buf) {
-    static int (*original)(int, const char*, struct stat*) = (int (*)(int, const char*, struct stat*))dlsym(RTLD_NEXT, "stat64");
+int winevfs____xstat(int ver, const char* path, struct stat* buf) {
+    static int (*original)(int, const char*, struct stat*) = (int (*)(int, const char*, struct stat*))dlsym(RTLD_NEXT, "__xstat");
     return original(ver, path, buf);
 }
 
-int winevfs____xstat(int ver, const char* path, struct stat* buf) {
-    static int (*original)(int, const char*, struct stat*) = (int (*)(int, const char*, struct stat*))dlsym(RTLD_NEXT, "__xstat");
+int winevfs__stat64(int ver, const char* path, struct stat* buf) {
+    static int (*original)(int, const char*, struct stat*) = (int (*)(int, const char*, struct stat*))dlsym(RTLD_NEXT, "stat64");
     return original(ver, path, buf);
 }
 
@@ -499,6 +499,22 @@ void* freopen64(const char* pathname, const char* mode, void* stream) {
     pathname = winevfs_get_path(pathname, pathname_intent, AT_FDCWD);
     void* ret = winevfs__freopen64(pathname, mode, stream);
     free((void*)pathname);
+    return ret;
+}
+
+int stat64(int ver, const char* path, struct stat* buf) {
+    Intent path_intent = Intent_Read;
+    path = winevfs_get_path(path, path_intent, AT_FDCWD);
+    int ret = winevfs__stat64(ver, path, buf);
+    free((void*)path);
+    return ret;
+}
+
+int __xstat64(int ver, const char* path, struct stat* buf) {
+    Intent path_intent = Intent_Read;
+    path = winevfs_get_path(path, path_intent, AT_FDCWD);
+    int ret = winevfs____xstat64(ver, path, buf);
+    free((void*)path);
     return ret;
 }
 
