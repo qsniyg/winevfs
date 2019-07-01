@@ -69,11 +69,18 @@ static DIR* fs_opendir(std::filesystem::path source) {
   return (DIR*)winevfs__opendir(path_str.c_str());
 }
 
-bool has_parent_path(std::filesystem::path source) {
+static bool has_parent_path(std::filesystem::path source) {
   return source.has_parent_path() && source.parent_path() != source;
 }
 
-void fs_mkdir_p(std::filesystem::path source) {
+static std::filesystem::path parent_path(std::filesystem::path source) {
+  if (source.has_filename())
+    return source.parent_path();
+  else
+    return source.parent_path().parent_path();
+}
+
+static void fs_mkdir_p(std::filesystem::path source) {
   if (!source.has_parent_path()) {
     return;
   }
@@ -97,7 +104,7 @@ static std::filesystem::path fs_getcwd() {
   {
     std::lock_guard<std::mutex> lock(fakecwd_mutex);
     if (fakecwd.size() > 0) {
-      printf("FAKECWD: %s\n", fakecwd.c_str());fflush(stdout);
+      //printf("FAKECWD: %s\n", fakecwd.c_str());fflush(stdout);
       return fakecwd;
     }
   }
@@ -105,7 +112,7 @@ static std::filesystem::path fs_getcwd() {
   char path[PATH_MAX];
   getcwd(path, PATH_MAX - 1);
 
-  printf("CWD: %s\n", path);fflush(stdout);
+  //printf("CWD: %s\n", path);fflush(stdout);
   return std::filesystem::path(path);
 }
 
@@ -143,7 +150,7 @@ std::string winevfs_get_fd_path(int atfd) {
     std::lock_guard<std::mutex> lock(winevfs_fd_table_mutex);
     auto it = winevfs_fd_table.find(atfd);
     if (it != winevfs_fd_table.end()) {
-      puts("Found in FD table");fflush(stdout);
+      //puts("Found in FD table");fflush(stdout);
       retpath = it->second;
     }
   }
@@ -160,7 +167,7 @@ std::string winevfs_get_fd_path(int atfd) {
   }
   readlinked[bytes] = 0;
 
-  printf("Found in proc: %s\n", readlinked);fflush(stdout);
+  //printf("Found in proc: %s\n", readlinked);fflush(stdout);
   if (retpath.size() > 0)
     return retpath;
 
@@ -299,15 +306,20 @@ static void add_folder(std::filesystem::path folder, std::filesystem::path dest)
   std::string lowerfolder = lower(folder_str);
   std::string folder_filename = folder.filename();
 
-  if (folder.has_parent_path() && folder.parent_path() != folder) {
-    add_folder(folder.parent_path(), dest.parent_path());
+  if (has_parent_path(folder)) {
+    add_folder(parent_path(folder), std::filesystem::path());
 
-    std::string parent_str = folder.parent_path();
+    std::string parent_str = parent_path(folder);
     std::string lowerparent = lower(parent_str);
 
     {
       std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
-      winevfs_folder_mappings[lowerparent].insert(folder_filename);
+      auto it = winevfs_folder_mappings.find(lowerparent);
+      if (it != winevfs_folder_mappings.end()) {
+        it->second.insert(folder_filename);
+      } else {
+        //std::cout << "PARENT NOT FOUND: " << lowerparent << std::endl;
+      }
     };
   }
 
@@ -317,24 +329,73 @@ static void add_folder(std::filesystem::path folder, std::filesystem::path dest)
     folder_set.folderpath = dest;
     winevfs_folder_mappings[lowerfolder] = folder_set;
 
-    std::string lowerdest = dest;
-    lowerdest = lower(lowerdest);
-    winevfs_reverse_folder_mappings[lowerdest] = lowerfolder;
+    //std::cout << "M: " << lowerfolder << " = " << dest << std::endl;
+
+    if (!dest.empty()) {
+      std::string lowerdest = dest;
+      lowerdest = lower(lowerdest);
+      winevfs_reverse_folder_mappings[lowerdest] = lowerfolder;
+      //std::cout << "F: " << lowerdest << " = " << lowerfolder << std::endl;
+
+      std::filesystem::path lowerpath = lowerfolder;
+      std::filesystem::path basepath = lowerpath.filename();
+      while (has_parent_path(lowerpath)) {
+        std::filesystem::path orig_lowerpath = lowerpath;
+        lowerpath = lowerpath.parent_path();
+
+        //std::cout << "NL: " << orig_lowerpath << std::endl;
+
+        auto folder_it = winevfs_folder_mappings.find(lowerpath);
+        if (folder_it != winevfs_folder_mappings.end()) {
+          if (folder_it->second.folderpath.size() > 0) {
+            std::string parent_altpath = folder_it->second.folderpath;
+            parent_altpath = lower(parent_altpath);
+
+            //std::cout << "PAL: " << parent_altpath << std::endl;
+
+            auto it = winevfs_reverse_folder_mappings.find(parent_altpath);
+            if (it != winevfs_reverse_folder_mappings.end()) {
+              //std::filesystem::path altpath = it->second;
+              //altpath = altpath / basepath;
+              //std::string altlower = altpath;
+              //altlower = lower(altlower);
+
+              std::filesystem::path altpath = parent_altpath;
+              altpath = altpath / basepath;
+
+              //std::cout << "LOWER: " << lowerdest << std::endl;
+              //std::cout << "ALT: " << altpath << " -> " << orig_lowerpath << std::endl;
+              winevfs_reverse_folder_mappings[altpath] = orig_lowerpath;
+            }
+          }
+        }
+
+        //lowerdest = lowerpath;
+        //lowerdest = lower(lowerdest);
+
+
+
+        std::string lowerfilename = lowerpath.filename();
+        basepath = lower(lowerfilename) / basepath;
+      }
+    }
   }
 }
 
-static void _add_read_entry(std::string source, std::string destination) {
-  {
+static void _add_read_entry(std::string source, std::string destination, bool isfolder = false) {
+  if (!isfolder) {
     std::lock_guard<std::mutex> lock(read_mappings_mutex);
     read_mappings[lower(source)] = destination;
   };
 
+  //std::cout << "RE: " << source << " -> " << destination << std::endl;
+
   std::filesystem::path source_path = source;
-  add_folder(source_path.parent_path(), std::filesystem::path(destination).parent_path());
+  add_folder(parent_path(source_path), parent_path(destination));
 
   {
     std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
-    std::string parent_str = source_path.parent_path();
+    std::string parent_str = parent_path(source_path);
     std::string source_filename = source_path.filename();
     winevfs_folder_mappings[lower(parent_str)].insert(source_filename);
   };
@@ -362,6 +423,7 @@ void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::p
       std::string path = source / entry->d_name;
 
       if (fs_isdir(out)) {
+        _add_read_entry(path, out, true);
         winevfs_add_read_directory(path, out);
       } else {
         _add_read_entry(path, out);
@@ -590,6 +652,7 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent, int atfd) 
   //   Return 0x65735546 for statfs.f_type and pretend a file named .ciopfs exists
   // TODO: If we're being called by stat(), send cached value if possible instead of
   //   falling through to another stat after this.
+  // TODO: Possibly redirect /Data/Data to /Data
 
   {
     std::lock_guard<std::mutex> lock(read_mappings_mutex);
@@ -601,6 +664,12 @@ std::string winevfs_get_path(std::filesystem::path in, Intent intent, int atfd) 
 
   {
     std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
+    auto reverse_it = winevfs_reverse_folder_mappings.find(path_lower);
+    if (reverse_it != winevfs_reverse_folder_mappings.end()) {
+      //printf("Found reverse: %s -> %s\n", path_lower.c_str(), reverse_it->second.c_str());fflush(stdout);
+      path_lower = reverse_it->second;
+    }
+
     auto it = winevfs_folder_mappings.find(path_lower);
     if (it != winevfs_folder_mappings.end()) {
       std::string win_path = winpath(path, atfd);

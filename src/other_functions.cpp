@@ -65,7 +65,7 @@ static bool winevfs_opendir_fill_info(char* path, int atfd, opendir_base_info* i
   std::string string_path = winevfs_abspath(std::string(path), atfd);
   info->path = winevfs_lower(string_path);
 
-  puts(info->path.c_str());
+  //puts(info->path.c_str());
 
   info->finished = false;
   info->position = 0;
@@ -74,7 +74,7 @@ static bool winevfs_opendir_fill_info(char* path, int atfd, opendir_base_info* i
   auto it = winevfs_folder_mappings.find(info->path);
   if (it == winevfs_folder_mappings.end()) {
     info->path = winevfs_reverse_folder_mappings[info->path];
-    puts(info->path.c_str());
+    //puts(info->path.c_str());
 
     it = winevfs_folder_mappings.find(info->path);
     if (it == winevfs_folder_mappings.end()) {
@@ -91,7 +91,7 @@ static void add_path_to_fdtable(int fd, std::string string_path, int atfd) {
 
   std::lock_guard<std::mutex> lock(winevfs_fd_table_mutex);
   winevfs_fd_table[fd] = string_path;
-  printf("open wrap: %s (%i)\n", string_path.c_str(), fd);fflush(stdout);
+  //printf("open wrap: %s (%i)\n", string_path.c_str(), fd);fflush(stdout);
 }
 
 extern "C" {
@@ -166,7 +166,7 @@ extern "C" {
     return execve(path, argv, environ);
     }*/
   struct dirent* readdir(DIR* dirp) {
-    puts("readdir");
+    //puts("readdir");
     struct dirent* entry = (struct dirent*)winevfs__readdir((void*)dirp);
 
     std::lock_guard<std::mutex> lock(opendir_mappings_mutex);
@@ -178,7 +178,7 @@ extern "C" {
         it->second.info.already.insert(winevfs_lower(name));
       }
 
-      puts(entry->d_name);fflush(stdout);
+      //puts(entry->d_name);fflush(stdout);
 
       return entry;
     }
@@ -197,7 +197,7 @@ extern "C" {
         continue;
 
       strcpy(it->second.temp->d_name, filename.c_str());
-      puts(it->second.temp->d_name);fflush(stdout);
+      //puts(it->second.temp->d_name);fflush(stdout);
 
       return it->second.temp;
     }
@@ -239,24 +239,24 @@ extern "C" {
         continue;
 
       strcpy(it->second.temp64->d_name, filename.c_str());
-      puts(it->second.temp64->d_name);fflush(stdout);
+      //puts(it->second.temp64->d_name);fflush(stdout);
 
       return it->second.temp64;
     }
   }
 
   int closedir(DIR* dirp) {
-    puts("closedir");
+    //puts("closedir");
     std::lock_guard<std::mutex> lock(opendir_mappings_mutex);
 
     auto it = opendir_mappings.find(dirp);
     if (it != opendir_mappings.end()) {
-      printf("closedir: %s\n", it->second.info.path.c_str());fflush(stdout);
+      //printf("closedir: %s\n", it->second.info.path.c_str());fflush(stdout);
       delete it->second.temp;
       delete it->second.temp64;
       opendir_mappings.erase(it);
     } else {
-      puts("closedir out of mappings");fflush(stdout);
+      //puts("closedir out of mappings");fflush(stdout);
     }
 
     auto it64 = opendir64_mappings.find(dirp);
@@ -276,7 +276,7 @@ extern "C" {
   // FIXME: write a proper implementation, tracking the "real" CWD, probably as a wrap
   static int winevfs_chdir(const char* path) {
     winevfs_setcwd(path);
-    printf("chdir %s\n", path);fflush(stdout);
+    //printf("chdir %s\n", path);fflush(stdout);
     int ret = winevfs__chdir(path);
     if (ret < 0)
       return winevfs__chdir("/tmp/.winevfs/fakedir");
@@ -288,10 +288,10 @@ extern "C" {
   }
 
   int fchdir1(int fd) {
-    printf("fchdir %i\n", fd);fflush(stdout);
+    //printf("fchdir %i\n", fd);fflush(stdout);
     // TODO: check if in mappings, if not, winevfs__fchdir
     std::string newpath = winevfs_get_fd_path(fd);
-    printf("fchdir: %s\n", newpath.c_str());fflush(stdout);
+    //printf("fchdir: %s\n", newpath.c_str());fflush(stdout);
     return winevfs_chdir(newpath.c_str());
   }
 
@@ -301,9 +301,9 @@ extern "C" {
     if (false) {
       auto it = winevfs_fd_table.find(fd);
       if (it != winevfs_fd_table.end()) {
-        printf("close: %s\n", it->second.c_str());fflush(stdout);
+        //printf("close: %s\n", it->second.c_str());fflush(stdout);
       } else {
-        puts("close out of mappings");fflush(stdout);
+        //puts("close out of mappings");fflush(stdout);
       }
     }
     winevfs_fd_table.erase(fd);
