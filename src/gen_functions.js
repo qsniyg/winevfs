@@ -412,6 +412,15 @@ var _functions = [
       ["struct statfs*", "buf"]
     ],
     origonly: true
+  },
+  {
+    ret: "int",
+    name: ["fstatfs", "__fstatfs"],
+    args: [
+      ["int", "fd"],
+      ["struct statfs*", "buf"]
+    ],
+    origonly: true
   }
 ];
 

@@ -370,6 +370,16 @@ int winevfs____statfs(const char* file, struct statfs* buf) {
     return original(file, buf);
 }
 
+int winevfs__fstatfs(int fd, struct statfs* buf) {
+    static int (*original)(int, struct statfs*) = (int (*)(int, struct statfs*))dlsym(RTLD_NEXT, "fstatfs");
+    return original(fd, buf);
+}
+
+int winevfs____fstatfs(int fd, struct statfs* buf) {
+    static int (*original)(int, struct statfs*) = (int (*)(int, struct statfs*))dlsym(RTLD_NEXT, "__fstatfs");
+    return original(fd, buf);
+}
+
 
 
 int winevfs_variadic__open(const char* pathname, int flags, mode_t mode) {

@@ -329,7 +329,10 @@ extern "C" {
   }
 
   int __xstat(int ver, const char* path, struct stat* buf) {
+    //puts("__xstat");fflush(stdout);
+    //puts(path);fflush(stdout);
     path = winevfs_get_path(path, Intent_Read, AT_FDCWD);
+    //puts(path);fflush(stdout);
     int ret = winevfs_stat(path, buf, true);
     free((void*)path);
     return ret;
@@ -341,20 +344,34 @@ extern "C" {
 
   int __statfs(const char* file, struct statfs* buf) {
     //puts("__statfs");fflush(stdout);
+    //puts(file);fflush(stdout);
     file = winevfs_get_path(file, Intent_Read, AT_FDCWD);
+    //puts(file);fflush(stdout);
     int ret = winevfs____statfs(file, buf);
     free((void*)file);
-
+    //printf("ret: %i\n", ret);fflush(stdout);
     buf->f_type = 0x65735546;
     return ret;
   }
 
   int statfs(const char* file, struct statfs* buf) {
     //puts("statfs");fflush(stdout);
+    //puts(file);fflush(stdout);
     file = winevfs_get_path(file, Intent_Read, AT_FDCWD);
+    //puts(file);fflush(stdout);
     int ret = winevfs__statfs(file, buf);
     free((void*)file);
+    //printf("ret: %i\n", ret);fflush(stdout);
 
+    buf->f_type = 0x65735546;
+    return ret;
+  }
+
+  int fstatfs1(int fd, struct statfs* buf) {
+    //puts("fstatfs");fflush(stdout);
+    int ret = winevfs__fstatfs(fd, buf);
+
+    //printf("ret: %i\n", ret);fflush(stdout);
     buf->f_type = 0x65735546;
     return ret;
   }
