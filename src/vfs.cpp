@@ -24,13 +24,13 @@ static std::string lower(std::string& in) {
   return winevfs_lower(in);
 }
 
-static int real_stat(const char* str, struct stat* buf) {
-  return winevfs____xstat(_STAT_VER_LINUX, str, buf);
+static int real_stat(const char* str, struct stat64* buf) {
+  return winevfs____xstat64(_STAT_VER, str, buf);
 }
 
-static std::unordered_map<std::string, struct stat> stat_cache;
+static std::unordered_map<std::string, struct stat64> stat_cache;
 static std::mutex stat_cache_mutex;
-int winevfs_stat(std::string path_str, struct stat* buf, bool use_cache = false) {
+int winevfs_stat(std::string path_str, struct stat64* buf, bool use_cache = false) {
   if (use_cache) {
     std::lock_guard<std::mutex> lock(stat_cache_mutex);
     auto it = stat_cache.find(path_str);
@@ -49,17 +49,17 @@ int winevfs_stat(std::string path_str, struct stat* buf, bool use_cache = false)
   return ret;
 }
 
-int fs_stat(std::filesystem::path path, struct stat* buf, bool use_cache = false) {
+int fs_stat(std::filesystem::path path, struct stat64* buf, bool use_cache = false) {
   return winevfs_stat(path, buf, use_cache);
 }
 
 static bool fs_exists(std::filesystem::path source, bool use_cache = false) {
-  struct stat s;
+  struct stat64 s;
   return fs_stat(source, &s, use_cache) == 0;
 }
 
 static bool fs_isdir(std::filesystem::path source, bool use_cache = false) {
-  struct stat s;
+  struct stat64 s;
   if (fs_stat(source, &s, use_cache))
     return false;
 
@@ -148,7 +148,7 @@ std::string winevfs_get_fd_path(int atfd) {
 
   std::string retpath;
 
-  {
+  if (false) {
     std::lock_guard<std::mutex> lock(winevfs_fd_table_mutex);
     auto it = winevfs_fd_table.find(atfd);
     if (it != winevfs_fd_table.end()) {
@@ -170,7 +170,7 @@ std::string winevfs_get_fd_path(int atfd) {
   readlinked[bytes] = 0;
 
   //printf("Found in proc: %s\n", readlinked);fflush(stdout);
-  if (retpath.size() > 0)
+  if (false && retpath.size() > 0)
     return retpath;
 
   return std::string(readlinked);
@@ -309,7 +309,18 @@ static void add_folder(std::filesystem::path folder, std::filesystem::path dest)
   std::string folder_filename = folder.filename();
 
   if (has_parent_path(folder)) {
-    add_folder(parent_path(folder), std::filesystem::path());
+    std::filesystem::path parent_folder = parent_path(folder);
+    std::string parent_filename = parent_folder.filename();
+    parent_filename = lower(parent_filename);
+    std::filesystem::path parent_dest = parent_path(dest);
+    std::string parent_dest_filename = parent_dest.filename();
+    parent_dest_filename = lower(parent_dest_filename);
+
+    if (parent_filename != parent_dest_filename) {
+      parent_dest = std::filesystem::path();
+    }
+
+    add_folder(parent_folder, parent_dest);
 
     std::string parent_str = parent_path(folder);
     std::string lowerparent = lower(parent_str);
@@ -459,6 +470,7 @@ void winevfs_add_write_directory(std::filesystem::path source, std::filesystem::
 static std::unordered_map<std::string, std::filesystem::path> path_cache;
 static std::mutex path_cache_mutex;
 static std::filesystem::path winpath(std::filesystem::path source, int atfd) {
+  // TODO: maybe rewrite so that it checks the cache first?
   if (atfd != AT_FDCWD)
     source = full_abspath(source, atfd);
 

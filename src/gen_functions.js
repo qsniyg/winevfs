@@ -85,8 +85,9 @@ var _functions = [
     args: [
       ["int", "ver"],
       ["const char*", "path", "r"],
-      ["struct stat*", "buf"]
+      ["struct stat64*", "buf"]
     ],
+    origonly: true
   },
   {
     ret: "int",
@@ -419,7 +420,8 @@ var _functions = [
       ["const char*", "file"],
       ["struct statfs*", "buf"]
     ],
-    origonly: true
+    origonly: true,
+    has_64: true
   },
   {
     ret: "int",
