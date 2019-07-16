@@ -3,6 +3,7 @@ set(BASE_SOURCES
   functions.cpp
   other_functions.cpp
   server.cpp
+  inotify.cpp
   )
 
 add_library(winevfs_lib64 SHARED ${BASE_SOURCES})

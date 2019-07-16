@@ -264,7 +264,7 @@ bool winevfs_init_server(char* patchfile) {
 static int serverfd = 0;
 static pthread_t client_thread;
 
-std::mutex winevfs_client_processing_mutex;
+//std::mutex winevfs_client_processing_mutex;
 static void* client_thread_fn(void* thread_data) {
   command_cb cb = (command_cb)thread_data;
   while (true) {
@@ -295,7 +295,7 @@ static void* client_thread_fn(void* thread_data) {
     printf("Received command %c (%i)\n", command, size);fflush(stdout);
 
     {
-      std::lock_guard<std::mutex> lock(winevfs_client_processing_mutex);
+      //std::lock_guard<std::mutex> lock(winevfs_client_processing_mutex);
       cb(command, data, size);
     }
 
