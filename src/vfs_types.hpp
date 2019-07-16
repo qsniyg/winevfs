@@ -9,4 +9,5 @@ struct unique_vector {
   std::vector<std::string> vector;
 
   void insert(std::string string);
+  void erase(std::string string);
 };

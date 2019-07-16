@@ -1,3 +1,4 @@
+#include <sys/types.h>
 extern "C" {
 int winevfs__open(const char* pathname, int flags, mode_t mode);
 int winevfs__open64(const char* pathname, int flags, mode_t mode);

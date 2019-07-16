@@ -252,7 +252,7 @@ extern "C" {
   }
 
   int closedir(DIR* dirp) {
-    //puts("closedir");
+    puts("closedir");
     std::lock_guard<std::mutex> lock(opendir_mappings_mutex);
 
     auto it = opendir_mappings.find(dirp);
@@ -330,12 +330,12 @@ extern "C" {
   }
 
   int __xstat64(int ver, const char* path, struct stat64* buf) {
-    //puts("__xstat64");fflush(stdout);
-    //puts(path);fflush(stdout);
+    puts("__xstat64");fflush(stdout);
+    puts(path);fflush(stdout);
     path = winevfs_get_path(path, Intent_Read, AT_FDCWD);
-    //puts(path);fflush(stdout);
-    int ret = winevfs_stat(path, buf, true);
-    //printf("ret: %i\n", ret);fflush(stdout);
+    puts(path);fflush(stdout);
+    int ret = winevfs_stat(path, buf, false);
+    printf("ret: %i\n", ret);fflush(stdout);
     free((void*)path);
     return ret;
   }
@@ -345,14 +345,14 @@ extern "C" {
   }
 
   int __xstat(int ver, const char* path, struct stat* buf) {
-    //puts("__xstat");fflush(stdout);
+    puts("__xstat");fflush(stdout);
     if (sizeof(struct stat) == sizeof (struct stat64)) {
       return __xstat64(ver, path, (struct stat64*)buf);
     }
 
-    //puts(path);fflush(stdout);
+    puts(path);fflush(stdout);
     path = winevfs_get_path(path, Intent_Read, AT_FDCWD);
-    //puts(path);fflush(stdout);
+    puts(path);fflush(stdout);
     int ret = winevfs____xstat(ver, path, buf);
     free((void*)path);
     return ret;
@@ -376,26 +376,26 @@ extern "C" {
   }
 
   int statfs(const char* file, struct statfs* buf) {
-    //puts("statfs");fflush(stdout);
-    //puts(file);fflush(stdout);
+    puts("statfs");fflush(stdout);
+    puts(file);fflush(stdout);
     file = winevfs_get_path(file, Intent_Read, AT_FDCWD);
-    //puts(file);fflush(stdout);
+    puts(file);fflush(stdout);
     int ret = winevfs__statfs(file, buf);
     free((void*)file);
-    //printf("ret: %i\n", ret);fflush(stdout);
+    printf("ret: %i\n", ret);fflush(stdout);
 
     buf->f_type = 0x65735546;
     return ret;
   }
 
   int statfs64(const char* file, struct statfs64* buf) {
-    //puts("statfs64");fflush(stdout);
-    //puts(file);fflush(stdout);
+    puts("statfs64");fflush(stdout);
+    puts(file);fflush(stdout);
     file = winevfs_get_path(file, Intent_Read, AT_FDCWD);
-    //puts(file);fflush(stdout);
+    puts(file);fflush(stdout);
     int ret = winevfs__statfs64(file, (struct statfs*)buf);
     free((void*)file);
-    //printf("ret: %i\n", ret);fflush(stdout);
+    printf("ret: %i\n", ret);fflush(stdout);
 
     buf->f_type = 0x65735546;
     return ret;

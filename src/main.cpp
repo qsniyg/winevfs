@@ -1,5 +1,11 @@
 #include "vfs.hpp"
 #include "functions.hpp"
+
+// for emacs
+#ifndef SERVER_BUILD
+#define SERVER_BUILD
+#endif
+#include "server.hpp"
 #include <iostream>
 #include <limits.h>
 #include <stdlib.h>
@@ -15,10 +21,19 @@ int main(int argc, char** argv) {
     }
   }
 
+  FILE* fp = (FILE*)winevfs__fopen("/tmp/.winevfs/vfsinfo_patch", "w");
+  fputs("quick\n", fp);
+  fflush(fp);
+  fclose(fp);
+
+  if (fork() == 0) {
+    return !winevfs_init_server((char*)"/tmp/.winevfs/vfsinfo_patch");
+  }
+
   puts("[winevfs] Loading VFS file");
   winevfs_init();
   puts("[winevfs] Writing VFS file");
-  winevfs_write_vfsfile("/tmp/.winevfs/vfsinfo");
+  winevfs_write_vfsfile((char*)"/tmp/.winevfs/vfsinfo");
   setenv("WINEVFS_VFSFILE", "/tmp/.winevfs/vfsinfo", true);
 
   char self_path[PATH_MAX];

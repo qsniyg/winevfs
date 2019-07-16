@@ -282,7 +282,7 @@ var _functions = [
     args: [
       ["const char*", "path", "r"]
     ],
-    origonly: true,
+    //origonly: true,
     //disabled: true // doesn't help
   },
   {
@@ -569,7 +569,7 @@ functions.forEach(fn => {
     });
   }
 
-  //retstr += "    puts(\"" + fn.name + "\");fflush(stdout);\n";
+  retstr += "    puts(\"" + fn.name + "\");fflush(stdout);\n";
   fn.args.forEach(arg => {
     if (arg.length === 3) {
       var iname = arg[1] + "_intent";
@@ -588,7 +588,7 @@ functions.forEach(fn => {
         retstr += "    " + iname + " = Intent_Delete;\n";
       }
 
-      //retstr += "    puts(" + arg[1] + ");fflush(stdout);\n";
+      retstr += "    puts(" + arg[1] + ");fflush(stdout);\n";
       var at = "AT_FDCWD";
       if (fn.at) {
         if (typeof fn.at === "string") {
@@ -599,7 +599,7 @@ functions.forEach(fn => {
       }
       retstr += "    " + arg[1] + " = winevfs_get_path(" + arg[1] + ", " + iname + ", " + at + ");\n";
 
-      //retstr += "    puts(" + arg[1] + ");fflush(stdout);\n";
+      retstr += "    puts(" + arg[1] + ");fflush(stdout);\n";
     }
   });
 
@@ -649,7 +649,8 @@ retstr += "}\n";
 
 fs.writeFileSync(__dirname + "/functions.cpp", retstr);
 
-retstr = 'extern "C" {\n';
+retstr = "#include <sys/types.h>\n";
+retstr += 'extern "C" {\n';
 
 functions.forEach(fn => {
   retstr += fnheader(fn, "winevfs__" + fn.name) + ";\n";
