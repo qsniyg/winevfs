@@ -121,6 +121,7 @@ static void* server_client_thread(void* data) {
     int size;
     void* data = nullptr;
 
+    puts("Awaiting command");fflush(stdout);
     int rc = read(clientfd, &command, 1);
     if (rc != 1) {
       //perror("read (command)");
@@ -182,6 +183,8 @@ static void* server_client_thread(void* data) {
     process_command(command, data, size);
 
     free(data);
+
+    puts("Finished processing");fflush(stdout);
   }
 
   // end
@@ -272,8 +275,6 @@ static void* client_thread_fn(void* thread_data) {
       break;
     }
 
-    std::lock_guard<std::mutex> lock(winevfs_client_processing_mutex);
-
     int size;
     rc = read_buffer(serverfd, &size, sizeof(size));
     if (rc != sizeof(size)) {
@@ -293,9 +294,14 @@ static void* client_thread_fn(void* thread_data) {
 
     printf("Received command %c (%i)\n", command, size);fflush(stdout);
 
-    cb(command, data, size);
+    {
+      std::lock_guard<std::mutex> lock(winevfs_client_processing_mutex);
+      cb(command, data, size);
+    }
 
     free(data);
+
+    printf("c: Finished processing command %c (%i)\n", command, size);fflush(stdout);
   }
 
   return NULL;

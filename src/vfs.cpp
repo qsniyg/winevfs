@@ -624,6 +624,9 @@ void winevfs_read_vfsfile(char* envfile) {
     }
 
     if (phase == 0) {
+      is_read = false;
+      is_delete = false;
+
       if (line[0] == 'R') {
         is_read = true;
       } else if (line[0] == 'W') {
@@ -754,7 +757,9 @@ std::string winevfs_get_path_inner(std::filesystem::path in, Intent intent, int 
   //printf("%i\n", getpid());
 
 #ifndef SERVER_BUILD
-  std::lock_guard<std::mutex> client_lock(winevfs_client_processing_mutex);
+  {
+    std::lock_guard<std::mutex> client_lock(winevfs_client_processing_mutex);
+  }
 #endif
 
   std::filesystem::path path;
@@ -785,7 +790,7 @@ std::string winevfs_get_path_inner(std::filesystem::path in, Intent intent, int 
   //std::cout << path << std::endl;
   std::string path_lower = lower(path_str);
 
-  //std::cout << "LOWER: " << path_lower << std::endl;fflush(stdout);
+  std::cout << "LOWER: " << path_lower << std::endl;fflush(stdout);
 
   // TODO: Handle Intent_Delete
   // TODO: Pretend it's case insensitive:
