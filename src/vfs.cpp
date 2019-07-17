@@ -450,7 +450,7 @@ static void _add_read_entry(std::string source, std::string destination, bool is
 }
 
 void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::path destination,
-                                std::string search) {
+                                std::string search, bool recursive) {
   source = winevfs_abspath(source);
   destination = winevfs_abspath(destination);
 
@@ -501,7 +501,7 @@ void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::p
         std::string entry_name = entry->d_name;
         entry_name = lower(entry_name);
         //std::cout << entry_name << " " << wanted_entry << std::endl;
-        if (!wanted_entry.empty() && entry_name == wanted_entry) {
+        if (recursive || (!wanted_entry.empty() && entry_name == wanted_entry)) {
           winevfs_add_read_directory(path, out, search);
         }
       } else {
@@ -827,7 +827,7 @@ static void listener_cb(fs_event event) {
     printf("FP: %s\n", lower_path.c_str());fflush(stdout);
 
     if (event.isdir) {
-      winevfs_add_read_directory(lower_path, path);
+      winevfs_add_read_directory(lower_path, path, "", true);
     } else {
       winevfs_add_read_file(lower_path, path);
     }

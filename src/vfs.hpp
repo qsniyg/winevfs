@@ -8,7 +8,7 @@
 std::string winevfs_lower(std::string& in);
 std::filesystem::path winevfs_abspath(std::filesystem::path source, int atfd=AT_FDCWD);
 void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::path destination,
-                                std::string search="");
+                                std::string search="", bool recursive = false);
 void winevfs_add_read_file(std::filesystem::path source, std::filesystem::path destination);
 void winevfs_add_write_directory(std::filesystem::path source, std::filesystem::path destination);
 void winevfs_init(bool client = false);
