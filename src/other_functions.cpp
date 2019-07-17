@@ -32,7 +32,7 @@ struct DIR {
   // a bunch of other stuff as well
 };
 
-extern std::unordered_map<std::string, unique_vector> winevfs_folder_mappings;
+extern std::unordered_map<std::string, folder_mapping> winevfs_folder_mappings;
 extern std::unordered_map<std::string, std::string> winevfs_reverse_folder_mappings;
 extern std::mutex winevfs_folder_mappings_mutex;
 std::string winevfs_abspath(std::string source, int atfd=AT_FDCWD);
@@ -144,11 +144,11 @@ static bool get_filename(opendir_base_info* info, std::string* filename) {
 
   std::lock_guard<std::mutex> folder_lock(winevfs_folder_mappings_mutex);
 
-  unique_vector* uv = &winevfs_folder_mappings[info->path];
-  if (info->position >= uv->vector.size())
+  folder_mapping* uv = &winevfs_folder_mappings[info->path];
+  if (info->position >= uv->children.vector.size())
     return false;
 
-  *filename = uv->vector[info->position++];
+  *filename = uv->children.vector[info->position++];
   return true;
 }
 

@@ -132,7 +132,7 @@ void winevfs_watch_directory(std::string directory) {
     return;
   }
 
-  printf("Adding %s to watched directories\n", directory.c_str());fflush(stdout);
+  //printf("Adding %s to watched directories\n", directory.c_str());fflush(stdout);
 
   std::lock_guard<std::mutex> lock(fdtable_mutex);
 
