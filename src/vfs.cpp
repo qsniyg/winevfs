@@ -378,6 +378,9 @@ static void add_folder(std::filesystem::path folder, std::filesystem::path dest)
   if (!dest.empty()) {
     std::string lowerdest = dest;
     lowerdest = lower(lowerdest);
+    if (lowerdest == lowerfolder)
+      return;
+
     winevfs_reverse_folder_mappings[lowerdest] = lowerfolder;
     //std::cout << "F: " << lowerdest << " = " << lowerfolder << std::endl;
 
@@ -838,9 +841,9 @@ static void listener_cb(fs_event event) {
   }
 }
 
-void winevfs_init(bool client) {
+void winevfs_init(bool client, bool force) {
   std::lock_guard<std::mutex> lock(inited_mutex);
-  if (inited)
+  if (inited && !force)
     return;
 
   // TODO: empty this directory
@@ -896,10 +899,26 @@ static std::string find_read_mapping(std::string path, bool simple = false) {
       std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
       auto it = winevfs_folder_mappings.find(path_str_lower);
       if (it != winevfs_folder_mappings.end() && it->second.children.empty()) {
-        printf("Found path for: %s\n", path_str.c_str());fflush(stdout);
+        printf("Found empty path for: %s\n", path_str.c_str());fflush(stdout);
         foldervec = it->second.folder_paths.vector;
       } else {
-        //printf("Not found path for: %s\n", path_str.c_str());
+        // TODO: add cache
+        if (it == winevfs_folder_mappings.end()) {
+          printf("Not found path for: %s\n", path_str.c_str());fflush(stdout);
+        } else {
+          printf("Not found path for: %s (but has children):\n", path_str.c_str());
+          if (!it->second.folder_paths.empty()) {
+            printf("  %s\n", it->second.folder_paths.last().c_str());
+          }
+          if (false) {
+            for (auto vit = it->second.children.vector.begin();
+                 vit != it->second.children.vector.end();
+                 vit++) {
+              printf("    %s\n", vit->c_str());fflush(stdout);
+            }
+          }
+          fflush(stdout);
+        }
       }
     }
 
@@ -907,7 +926,7 @@ static std::string find_read_mapping(std::string path, bool simple = false) {
       for (auto fp_it = foldervec.begin();
            fp_it != foldervec.end();
            fp_it++) {
-        //printf("Adding %s for %s\n", (*fp_it).c_str(), path_str_lower.c_str());fflush(stdout);
+        printf("Adding %s for %s\n", (*fp_it).c_str(), path_str_lower.c_str());fflush(stdout);
         winevfs_add_read_directory(path_str_lower, *fp_it, path_lower);
       }
 
@@ -932,7 +951,8 @@ std::string winevfs_get_path_inner(std::filesystem::path in, Intent intent, int 
 
   std::filesystem::path path;
 
-  if (in.is_relative() && !has_parent_path(in)) {
+  // TODO: CWD for folders that still need to be found through find_read_mappings
+  if (false && in.is_relative() && !has_parent_path(in)) {
     std::filesystem::path cwd = fs_getcwd();
     std::string cwd_lower = cwd;
     cwd_lower = lower(cwd_lower);
@@ -960,6 +980,29 @@ std::string winevfs_get_path_inner(std::filesystem::path in, Intent intent, int 
 
   std::cout << "LOWER: " << path_lower << std::endl;fflush(stdout);
 
+  {
+    std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
+    std::string path_add;
+    std::string new_path_lower = path_lower;
+    std::filesystem::path path_lower_fs = new_path_lower;
+
+    while (has_parent_path(path_lower_fs)) {
+      //printf("Trying %s\n", (new_path_lower).c_str());
+      auto reverse_it = winevfs_reverse_folder_mappings.find(new_path_lower);
+      if (reverse_it != winevfs_reverse_folder_mappings.end()) {
+        printf("Found reverse: %s -> %s\n", path_lower.c_str(), (reverse_it->second + path_add).c_str());fflush(stdout);
+        path_lower = reverse_it->second + path_add;
+        path = path_lower;
+        path_str = path_lower;
+        break;
+      }
+
+      path_add = std::string("/") + std::string(path_lower_fs.filename()) + path_add;
+      path_lower_fs = parent_path(path_lower_fs);
+      new_path_lower = path_lower_fs;
+    }
+  }
+
   // TODO: Handle Intent_Delete -- done(ish)
   // TODO: Pretend it's case insensitive:
   //   https://github.com/wine-mirror/wine/blob/ba9f3dc198dfc81bb40159077b73b797006bb73c/dlls/ntdll/directory.c#L1167
@@ -986,7 +1029,7 @@ std::string winevfs_get_path_inner(std::filesystem::path in, Intent intent, int 
     }
   };
 
-  std::string readmapping = find_read_mapping(path_str);
+  std::string readmapping = find_read_mapping(path_lower);
   if (!readmapping.empty()) {
     std::cout << "READM: " << readmapping << std::endl;fflush(stdout);
     {
@@ -997,13 +1040,17 @@ std::string winevfs_get_path_inner(std::filesystem::path in, Intent intent, int 
   }
 
   {
-    std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
-    auto reverse_it = winevfs_reverse_folder_mappings.find(path_lower);
-    if (reverse_it != winevfs_reverse_folder_mappings.end()) {
-      //printf("Found reverse: %s -> %s\n", path_lower.c_str(), reverse_it->second.c_str());fflush(stdout);
-      path_lower = reverse_it->second;
+    // Not needed anymore?
+    if (false) {
+      std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
+      auto reverse_it = winevfs_reverse_folder_mappings.find(path_lower);
+      if (reverse_it != winevfs_reverse_folder_mappings.end()) {
+        //printf("Found reverse: %s -> %s\n", path_lower.c_str(), reverse_it->second.c_str());fflush(stdout);
+        path_lower = reverse_it->second;
+      }
     }
 
+    std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
     auto it = winevfs_folder_mappings.find(path_lower);
     if (it != winevfs_folder_mappings.end()) {
       std::string win_path = winpath(path, atfd);
@@ -1031,6 +1078,7 @@ std::string winevfs_get_path_inner(std::filesystem::path in, Intent intent, int 
           std::cout << "WRITE (new): " << newpath << std::endl;fflush(stdout);
           newpath = winpath(newpath, AT_FDCWD);
           std::cout << "WRITE (new_win): " << newpath << std::endl;fflush(stdout);
+
           fs_mkdir_p(newpath.parent_path());
 
 #ifndef SERVER_BUILD

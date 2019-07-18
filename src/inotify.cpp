@@ -108,6 +108,7 @@ static void* listener_thread_fn(void*) {
   return nullptr;
 }
 
+// Fork kills this
 bool winevfs_init_listen(inotify_cb _cb) {
   puts("Initializing inotify");fflush(stdout);
 
@@ -116,6 +117,12 @@ bool winevfs_init_listen(inotify_cb _cb) {
   if (inotify_fd == -1) {
     perror("inotify_init1");
     return false;
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(fdtable_mutex);
+    fdtable.clear();
+    reverse_fdtable.clear();
   }
 
   if (pthread_create(&listener_thread, NULL, listener_thread_fn, NULL)) {

@@ -69,6 +69,8 @@ int winevfs____fchdir(int fd);
 int winevfs__close(int fd);
 int winevfs__dup(int fd);
 int winevfs____dup(int fd);
+int winevfs__dup2(int fd1, int fd2);
+int winevfs____dup2(int fd1, int fd2);
 ssize_t winevfs__sendmsg(int socket, void* message, int flags);
 ssize_t winevfs__recvmsg(int socket, void* message, int flags);
 int winevfs__statfs(const char* file, struct statfs* buf);
@@ -77,4 +79,5 @@ int winevfs____statfs(const char* file, struct statfs* buf);
 int winevfs____statfs64(const char* file, struct statfs* buf);
 int winevfs__fstatfs(int fd, struct statfs* buf);
 int winevfs____fstatfs(int fd, struct statfs* buf);
+pid_t winevfs__setsid();
 }

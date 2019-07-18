@@ -394,6 +394,15 @@ var _functions = [
     origonly: true
   },
   {
+    ret: "int",
+    name: ["dup2", "__dup2"],
+    args: [
+      ["int", "fd1"],
+      ["int", "fd2"]
+    ],
+    origonly: true
+  },
+  {
     ret: "ssize_t",
     name: ["sendmsg"],
     args: [
@@ -430,6 +439,12 @@ var _functions = [
       ["int", "fd"],
       ["struct statfs*", "buf"]
     ],
+    origonly: true
+  },
+  {
+    ret: "pid_t",
+    name: "setsid",
+    args: [],
     origonly: true
   }
 ];

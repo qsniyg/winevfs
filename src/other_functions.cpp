@@ -40,6 +40,7 @@ std::string winevfs_winpath(std::string source, int atfd);
 std::string winevfs_get_fd_path(int atfd);
 void winevfs_setcwd(const char* cwd);
 int winevfs_stat(std::string path_str, struct stat64* buf, bool use_cache = false);
+void winevfs_init(bool client, bool force);
 
 extern std::unordered_map<int, std::string> winevfs_fd_table;
 extern std::mutex winevfs_fd_table_mutex;
@@ -210,7 +211,7 @@ extern "C" {
   }
 
   struct dirent64* readdir64(DIR* dirp) {
-    //puts("readdir64");
+    puts("readdir64");
     if (sizeof(dirent64) == sizeof(dirent)) {
       return (struct dirent64*)readdir(dirp);
     }
@@ -226,7 +227,7 @@ extern "C" {
         it->second.info.already.insert(winevfs_lower(name));
       }
 
-      //puts(entry->d_name);fflush(stdout);
+      puts(entry->d_name);fflush(stdout);
 
       return entry;
     }
@@ -245,7 +246,7 @@ extern "C" {
         continue;
 
       strcpy(it->second.temp64->d_name, filename.c_str());
-      //puts(it->second.temp64->d_name);fflush(stdout);
+      puts(it->second.temp64->d_name);fflush(stdout);
 
       return it->second.temp64;
     }
@@ -317,7 +318,7 @@ extern "C" {
     return winevfs__close(fd);
   }
 
-  int dup(int fd) {
+  int _dup(int fd) {
     //puts("dup");fflush(stdout);
     int newfd = winevfs__dup(fd);
     //printf("dup: %i -> %i\n", fd, newfd);fflush(stdout);
@@ -327,6 +328,13 @@ extern "C" {
       winevfs_fd_table[newfd] = it->second;
 
     return newfd;
+  }
+
+  int dup2(int fd1, int fd2) {
+    if (fd2 == 0 || fd2 == 1)
+      return fd2;
+
+    return winevfs__dup2(fd1, fd2);
   }
 
   int __xstat64(int ver, const char* path, struct stat64* buf) {
@@ -408,6 +416,15 @@ extern "C" {
     //printf("ret: %i\n", ret);fflush(stdout);
     buf->f_type = 0x65735546;
     return ret;
+  }
+
+  // This should be done in fork() instead, but
+  //   it would make it twice as slow to fork() + execve()
+  //   as it would be run twice
+  pid_t setsid() {
+    puts("setsid");fflush(stdout);
+    winevfs_init(true, true);
+    return winevfs__setsid();
   }
 
   static bool is_possible_fd(struct msghdr* message) {

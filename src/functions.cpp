@@ -350,6 +350,16 @@ int winevfs____dup(int fd) {
     return original(fd);
 }
 
+int winevfs__dup2(int fd1, int fd2) {
+    static int (*original)(int, int) = (int (*)(int, int))dlsym(RTLD_NEXT, "dup2");
+    return original(fd1, fd2);
+}
+
+int winevfs____dup2(int fd1, int fd2) {
+    static int (*original)(int, int) = (int (*)(int, int))dlsym(RTLD_NEXT, "__dup2");
+    return original(fd1, fd2);
+}
+
 ssize_t winevfs__sendmsg(int socket, void* message, int flags) {
     static ssize_t (*original)(int, void*, int) = (ssize_t (*)(int, void*, int))dlsym(RTLD_NEXT, "sendmsg");
     return original(socket, message, flags);
@@ -388,6 +398,11 @@ int winevfs__fstatfs(int fd, struct statfs* buf) {
 int winevfs____fstatfs(int fd, struct statfs* buf) {
     static int (*original)(int, struct statfs*) = (int (*)(int, struct statfs*))dlsym(RTLD_NEXT, "__fstatfs");
     return original(fd, buf);
+}
+
+pid_t winevfs__setsid() {
+    static pid_t (*original)() = (pid_t (*)())dlsym(RTLD_NEXT, "setsid");
+    return original();
 }
 
 
