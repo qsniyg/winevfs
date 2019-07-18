@@ -798,14 +798,14 @@ static void listener_cb(fs_event event) {
   std::lock_guard<std::mutex> processing_lock(winevfs_client_processing_mutex);
 
   if (event.event == 'R') {
-    //puts("READ:");fflush(stdout);
+    puts("READ:");fflush(stdout);
     std::filesystem::path path = event.file;
     std::filesystem::path newpath;
     std::string lower_path = parent_path(path);
     lower_path = lower(lower_path);
     bool found = false;
 
-    //printf("EF: %s\n", event.file.c_str());fflush(stdout);
+    printf("EF: %s\n", event.file.c_str());fflush(stdout);
     //printf("LP: %s\n", lower_path.c_str());fflush(stdout);
 
     {
@@ -827,7 +827,7 @@ static void listener_cb(fs_event event) {
     lower_path = newpath;
     lower_path = lower(lower_path);
 
-    //printf("FP: %s\n", lower_path.c_str());fflush(stdout);
+    printf("FP: %s\n", lower_path.c_str());fflush(stdout);
 
     if (event.isdir) {
       winevfs_add_read_directory(lower_path, path, "", true);
@@ -835,8 +835,8 @@ static void listener_cb(fs_event event) {
       winevfs_add_read_file(lower_path, path);
     }
   } else {
-    //puts("DELETE:");fflush(stdout);
-    //printf("file: %s\n", event.file.c_str());fflush(stdout);
+    puts("DELETE:");fflush(stdout);
+    printf("file: %s\n", event.file.c_str());fflush(stdout);
     winevfs_delete_file(event.file);
   }
 }
@@ -899,21 +899,21 @@ static std::string find_read_mapping(std::string path, bool simple = false) {
       std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
       auto it = winevfs_folder_mappings.find(path_str_lower);
       if (it != winevfs_folder_mappings.end() && it->second.children.empty()) {
-        //printf("Found empty path for: %s\n", path_str.c_str());fflush(stdout);
+        printf("Found empty path for: %s\n", path_str.c_str());fflush(stdout);
         foldervec = it->second.folder_paths.vector;
       } else {
         // TODO: add cache
         if (it == winevfs_folder_mappings.end()) {
-          //printf("Not found path for: %s\n", path_str.c_str());fflush(stdout);
+          printf("Not found path for: %s\n", path_str.c_str());fflush(stdout);
         } else {
-          if (false) {
-            printf("Not found path for: %s (but has children):\n", path_str.c_str());
+          if (true) {
+            printf("Not found empty path for: %s (but has children):\n", path_str.c_str());
             if (!it->second.folder_paths.empty()) {
               printf("  %s\n", it->second.folder_paths.last().c_str());
             }
           }
-          return "";
-          if (false) {
+
+          if (true) {
             for (auto vit = it->second.children.vector.begin();
                  vit != it->second.children.vector.end();
                  vit++) {
@@ -921,16 +921,21 @@ static std::string find_read_mapping(std::string path, bool simple = false) {
             }
           }
           fflush(stdout);
+
+          return "";
         }
       }
     }
 
     if (!foldervec.empty()) {
-      for (auto fp_it = foldervec.begin();
-           fp_it != foldervec.end();
-           fp_it++) {
-        //printf("Adding %s for %s\n", (*fp_it).c_str(), path_str_lower.c_str());fflush(stdout);
-        winevfs_add_read_directory(path_str_lower, *fp_it, path_lower);
+      {
+        std::lock_guard<std::mutex> processing_lock(winevfs_client_processing_mutex);
+        for (auto fp_it = foldervec.begin();
+             fp_it != foldervec.end();
+             fp_it++) {
+          printf("Adding %s for %s\n", (*fp_it).c_str(), path_str_lower.c_str());fflush(stdout);
+          winevfs_add_read_directory(path_str_lower, *fp_it, path_lower);
+        }
       }
 
       return find_read_mapping(path, true);
@@ -981,7 +986,7 @@ std::string winevfs_get_path_inner(std::filesystem::path in, Intent intent, int 
   //std::cout << path << std::endl;
   std::string path_lower = lower(path_str);
 
-  //std::cout << "LOWER: " << path_lower << std::endl;fflush(stdout);
+  std::cout << "LOWER: " << path_lower << std::endl;fflush(stdout);
 
   {
     std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
@@ -1034,7 +1039,7 @@ std::string winevfs_get_path_inner(std::filesystem::path in, Intent intent, int 
 
   std::string readmapping = find_read_mapping(path_lower);
   if (!readmapping.empty()) {
-    //std::cout << "READM: " << readmapping << std::endl;fflush(stdout);
+    std::cout << "READM: " << readmapping << std::endl;fflush(stdout);
     {
       std::lock_guard<std::mutex> lock1(stat_cache_mutex);
       stat_cache.erase(readmapping);
@@ -1057,7 +1062,7 @@ std::string winevfs_get_path_inner(std::filesystem::path in, Intent intent, int 
     auto it = winevfs_folder_mappings.find(path_lower);
     if (it != winevfs_folder_mappings.end()) {
       std::string win_path = winpath(path, atfd);
-      //std::cout << "FOLDER WINP: " << win_path << std::endl;fflush(stdout);
+      std::cout << "FOLDER WINP: " << win_path << std::endl;fflush(stdout);
 
       if (!fs_isdir(win_path, true))
         return it->second.folder_paths.last();//"/tmp/.winevfs/fakedir/";
@@ -1076,11 +1081,11 @@ std::string winevfs_get_path_inner(std::filesystem::path in, Intent intent, int 
           if (rest[0] == '/')
             rest++;
 
-          //std::cout << "WRITE: " << path << std::endl;fflush(stdout);
+          std::cout << "WRITE: " << path << std::endl;fflush(stdout);
           std::filesystem::path newpath = std::filesystem::path(it->second) / std::filesystem::path(rest);
-          //std::cout << "WRITE (new): " << newpath << std::endl;fflush(stdout);
+          std::cout << "WRITE (new): " << newpath << std::endl;fflush(stdout);
           newpath = winpath(newpath, AT_FDCWD);
-          //std::cout << "WRITE (new_win): " << newpath << std::endl;fflush(stdout);
+          std::cout << "WRITE (new_win): " << newpath << std::endl;fflush(stdout);
 
           fs_mkdir_p(newpath.parent_path());
 
