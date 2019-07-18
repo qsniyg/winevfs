@@ -211,7 +211,7 @@ extern "C" {
   }
 
   struct dirent64* readdir64(DIR* dirp) {
-    puts("readdir64");
+    //puts("readdir64");
     if (sizeof(dirent64) == sizeof(dirent)) {
       return (struct dirent64*)readdir(dirp);
     }
@@ -227,7 +227,7 @@ extern "C" {
         it->second.info.already.insert(winevfs_lower(name));
       }
 
-      puts(entry->d_name);fflush(stdout);
+      //puts(entry->d_name);fflush(stdout);
 
       return entry;
     }
@@ -246,14 +246,14 @@ extern "C" {
         continue;
 
       strcpy(it->second.temp64->d_name, filename.c_str());
-      puts(it->second.temp64->d_name);fflush(stdout);
+      //puts(it->second.temp64->d_name);fflush(stdout);
 
       return it->second.temp64;
     }
   }
 
   int closedir(DIR* dirp) {
-    puts("closedir");
+    //puts("closedir");
     std::lock_guard<std::mutex> lock(opendir_mappings_mutex);
 
     auto it = opendir_mappings.find(dirp);
@@ -330,7 +330,8 @@ extern "C" {
     return newfd;
   }
 
-  int dup2(int fd1, int fd2) {
+  // For debugging wineserver
+  int dup2_1(int fd1, int fd2) {
     if (fd2 == 0 || fd2 == 1)
       return fd2;
 
@@ -338,12 +339,12 @@ extern "C" {
   }
 
   int __xstat64(int ver, const char* path, struct stat64* buf) {
-    puts("__xstat64");fflush(stdout);
-    puts(path);fflush(stdout);
+    //puts("__xstat64");fflush(stdout);
+    //puts(path);fflush(stdout);
     path = winevfs_get_path(path, Intent_Read, AT_FDCWD);
-    puts(path);fflush(stdout);
+    //puts(path);fflush(stdout);
     int ret = winevfs_stat(path, buf, false);
-    printf("ret: %i\n", ret);fflush(stdout);
+    //printf("ret: %i\n", ret);fflush(stdout);
     free((void*)path);
     return ret;
   }
@@ -353,14 +354,14 @@ extern "C" {
   }
 
   int __xstat(int ver, const char* path, struct stat* buf) {
-    puts("__xstat");fflush(stdout);
+    //puts("__xstat");fflush(stdout);
     if (sizeof(struct stat) == sizeof (struct stat64)) {
       return __xstat64(ver, path, (struct stat64*)buf);
     }
 
-    puts(path);fflush(stdout);
+    //puts(path);fflush(stdout);
     path = winevfs_get_path(path, Intent_Read, AT_FDCWD);
-    puts(path);fflush(stdout);
+    //puts(path);fflush(stdout);
     int ret = winevfs____xstat(ver, path, buf);
     free((void*)path);
     return ret;
@@ -384,26 +385,26 @@ extern "C" {
   }
 
   int statfs(const char* file, struct statfs* buf) {
-    puts("statfs");fflush(stdout);
-    puts(file);fflush(stdout);
+    //puts("statfs");fflush(stdout);
+    //puts(file);fflush(stdout);
     file = winevfs_get_path(file, Intent_Read, AT_FDCWD);
-    puts(file);fflush(stdout);
+    //puts(file);fflush(stdout);
     int ret = winevfs__statfs(file, buf);
     free((void*)file);
-    printf("ret: %i\n", ret);fflush(stdout);
+    //printf("ret: %i\n", ret);fflush(stdout);
 
     buf->f_type = 0x65735546;
     return ret;
   }
 
   int statfs64(const char* file, struct statfs64* buf) {
-    puts("statfs64");fflush(stdout);
-    puts(file);fflush(stdout);
+    //puts("statfs64");fflush(stdout);
+    //puts(file);fflush(stdout);
     file = winevfs_get_path(file, Intent_Read, AT_FDCWD);
-    puts(file);fflush(stdout);
+    //puts(file);fflush(stdout);
     int ret = winevfs__statfs64(file, (struct statfs*)buf);
     free((void*)file);
-    printf("ret: %i\n", ret);fflush(stdout);
+    //printf("ret: %i\n", ret);fflush(stdout);
 
     buf->f_type = 0x65735546;
     return ret;
@@ -421,8 +422,9 @@ extern "C" {
   // This should be done in fork() instead, but
   //   it would make it twice as slow to fork() + execve()
   //   as it would be run twice
+  // This function is called in wineserver
   pid_t setsid() {
-    puts("setsid");fflush(stdout);
+    //puts("setsid");fflush(stdout);
     winevfs_init(true, true);
     return winevfs__setsid();
   }

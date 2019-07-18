@@ -17,7 +17,7 @@ static inotify_cb fs_cb;
 static pthread_t listener_thread;
 
 static void process_inotify_event(struct inotify_event* ievent) {
-  puts("Processing inotify event");fflush(stdout);
+  //puts("Processing inotify event");fflush(stdout);
 
   struct fs_event event;
 
@@ -110,7 +110,7 @@ static void* listener_thread_fn(void*) {
 
 // Fork kills this
 bool winevfs_init_listen(inotify_cb _cb) {
-  puts("Initializing inotify");fflush(stdout);
+  //puts("Initializing inotify");fflush(stdout);
 
   fs_cb = _cb;
   inotify_fd = inotify_init1(IN_NONBLOCK);
