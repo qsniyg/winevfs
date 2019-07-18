@@ -31,7 +31,7 @@ There are also a number of limitations that may or may not be addressed in futur
 
 ### Usage
 
-Winevfs is primarily intended to be used with [movfs4l.py]https://github.com/ajventer/ksp_stuff/blob/master/movfs4l.py),
+Winevfs is primarily intended to be used with [movfs4l.py](https://github.com/ajventer/ksp_stuff/blob/master/movfs4l.py),
 but it can also be run manually if needed.
 
 It reads a VFS information file that contains a list of every file or directory that will be redirected,
