@@ -910,6 +910,7 @@ static std::string find_read_mapping(std::string path, bool simple = false) {
           if (!it->second.folder_paths.empty()) {
             printf("  %s\n", it->second.folder_paths.last().c_str());
           }
+          return "";
           if (false) {
             for (auto vit = it->second.children.vector.begin();
                  vit != it->second.children.vector.end();
