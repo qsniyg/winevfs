@@ -737,6 +737,7 @@ int symlinkat(const char* from, int tofd, const char* to) {
 
 int mkdir(const char* path, unsigned int mode) {
     Intent path_intent = Intent_Read;
+    path_intent = Intent_Create;
     path = winevfs_get_path(path, path_intent, AT_FDCWD);
     int ret = winevfs__mkdir(path, mode);
     free((void*)path);
@@ -745,6 +746,7 @@ int mkdir(const char* path, unsigned int mode) {
 
 int __mkdir(const char* path, unsigned int mode) {
     Intent path_intent = Intent_Read;
+    path_intent = Intent_Create;
     path = winevfs_get_path(path, path_intent, AT_FDCWD);
     int ret = winevfs____mkdir(path, mode);
     free((void*)path);

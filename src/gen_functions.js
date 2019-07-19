@@ -222,7 +222,7 @@ var _functions = [
     ret: "int",
     name: ["mkdir", "__mkdir"],
     args: [
-      ["const char*", "path", "r"],
+      ["const char*", "path", "w"],
       //["mode_t", "mode"]
       ["unsigned int", "mode"]
     ]
