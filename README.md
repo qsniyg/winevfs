@@ -28,8 +28,28 @@ There are also a number of limitations that may or may not be addressed in futur
  * This has only been tested with Bethesda games, and a few tools related to them.
  * wineserver must not be already running prior to this, as it needs to hook LD_PRELOAD into it
    in order to function.
+   * **Make sure the hooked wineserver is killed before running a program without winevfs!**
+     If you don't, the program _will_ fail, some in more disasterous ways than others.
+     * Mod Organizer will clear your entire profile.
  * The case-insensitive string comparison only supports ASCII, it needs to support the full
    Unicode specification to be correct.
+ * It works using a path cache instead of a node tree. What originally started out as an optimization
+   ended up making the codebase significantly more complex and slower in some cases. Fixing this
+   would require rewriting a significant amount of the code.
+
+Programs that currently work (tested):
+
+ * Skyrim (LE)
+ * Fallout 4
+ * Fallout NV
+ * FNIS (requires `dotnet40` to work)
+ * Bodyslide
+
+Programs that do not work (yet):
+
+ * Nemesis Unlimited Behavior Engine (requires wine-mono to work, it fails under `dotnet40`)
+   * It's a heavily multithreaded application, which currently fails due to a few thread races
+   * I'm currently trying to fix it
 
 ### Usage
 
