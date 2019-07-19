@@ -28,6 +28,8 @@ There are also a number of limitations that may or may not be addressed in futur
  * This has only been tested with Bethesda games, and a few tools related to them.
  * wineserver must not be already running prior to this, as it needs to hook LD_PRELOAD into it
    in order to function.
+ * The case-insensitive string comparison only supports ASCII, it needs to support the full
+   Unicode specification to be correct.
 
 ### Usage
 
