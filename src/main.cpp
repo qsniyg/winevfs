@@ -22,9 +22,11 @@ int main(int argc, char** argv) {
   }
 
   FILE* fp = (FILE*)winevfs__fopen("/tmp/.winevfs/vfsinfo_patch", "w");
-  fputs("quick\n", fp);
-  fflush(fp);
-  fclose(fp);
+  if (fp) {
+    fputs("quick\n", fp);
+    fflush(fp);
+    fclose(fp);
+  }
 
   if (false && fork() == 0) {
     return !winevfs_init_server((char*)"/tmp/.winevfs/vfsinfo_patch");
