@@ -534,6 +534,7 @@ function varnames(fn, variadic) {
 var retstr = "";
 
 retstr += '#include "vfs_minimal.hpp"\n';
+retstr += '#include "log.h"\n';
 retstr += "#include <sys/types.h>\n";
 retstr += "#define RTLD_NEXT ((void*) -1l)\n";
 retstr += "#define O_CREAT 0100\n";
@@ -541,12 +542,12 @@ retstr += "#define O_CREAT 0100\n";
 retstr += 'extern "C" {\n';
 retstr += "extern void* dlsym (void* handle, const char* name);\n\n";
 retstr += "extern void free(void *ptr);";
-retstr += "extern int puts(const char *s);";
+//retstr += "extern int puts(const char *s);";
 retstr += "extern void winevfs_add_opendir(void* dir, const char* path, int atfd);";
 retstr += "extern void winevfs_add_opendir64(void* dir, const char* path, int atfd);";
 retstr += "extern void winevfs_wrap_open(int fd, const char* path, int atfd=AT_FDCWD);";
-retstr += "extern void fflush(void* stream);";
-retstr += "extern void* stdout;";
+//retstr += "extern void fflush(void* stream);";
+//retstr += "extern void* stdout;";
 
 
 functions.forEach(fn => {
@@ -584,6 +585,38 @@ functions.forEach(fn => {
     });
   }
 
+  function do_trace(inout) {
+    retstr += "    trace(\"" + inout + ": " + fn.name + "(";
+    var fmtargs = [];
+    var outargs = [];
+    fn.args.forEach(arg => {
+      if (arg[0] === "...")
+        return;
+
+      var fmtarg = arg[1] + "=";
+
+      if (arg[0] === "char*" ||
+          arg[0] === "const char*") {
+        fmtarg += "%s";
+        outargs.push(arg[1]);
+      } else if (arg[arg.length - 1] === "*") {
+        fmtarg += "%p";
+        outargs.push(arg[1]);
+      } else {
+        fmtarg += "%i";
+        outargs.push(arg[1]);
+      }
+
+      fmtargs.push(fmtarg);
+    });
+    retstr += fmtargs.join(", ");
+    retstr += ")\", ";
+    retstr += outargs.join(", ");
+    retstr += ");\n";
+  }
+
+  do_trace(" in");
+
   //retstr += "    puts(\"" + fn.name + "\");fflush(stdout);\n";
   fn.args.forEach(arg => {
     if (arg.length === 3) {
@@ -617,6 +650,8 @@ functions.forEach(fn => {
       //retstr += "    puts(" + arg[1] + ");fflush(stdout);\n";
     }
   });
+
+  do_trace("out");
 
   retstr += "    " + fn.ret + " ret = winevfs__" + fn.name + "(" + varnames(fn) + ");\n";
 

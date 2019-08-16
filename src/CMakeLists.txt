@@ -1,4 +1,5 @@
 set(BASE_SOURCES
+  log.cpp
   vfs.cpp
   functions.cpp
   other_functions.cpp

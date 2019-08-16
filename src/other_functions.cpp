@@ -24,6 +24,7 @@
 #include "vfs_types.hpp"
 #include "vfs_minimal.hpp"
 #include "functions.hpp"
+#include "log.h"
 
 //extern char** environ;
 
@@ -174,6 +175,7 @@ extern "C" {
     }*/
   struct dirent* readdir(DIR* dirp) {
     //puts("readdir");
+    //trace("readdir(dirp=%p)", dirp);
     struct dirent* entry = (struct dirent*)winevfs__readdir((void*)dirp);
 
     std::lock_guard<std::mutex> lock(opendir_mappings_mutex);
@@ -185,6 +187,8 @@ extern "C" {
         it->second.info.already.insert(winevfs_lower(name));
       }
 
+      //trace("readdir: %s", entry->d_name);
+      trace("readdir(dirp=%p): %s", dirp, entry->d_name);
       //puts(entry->d_name);fflush(stdout);
 
       return entry;
@@ -204,6 +208,8 @@ extern "C" {
         continue;
 
       strcpy(it->second.temp->d_name, filename.c_str());
+      //trace("readdir (vfs): %s", it->second.temp->d_name);
+      trace("readdir(dirp=%p) vfs: %s", dirp, it->second.temp->d_name);
       //puts(it->second.temp->d_name);fflush(stdout);
 
       return it->second.temp;
@@ -212,6 +218,7 @@ extern "C" {
 
   struct dirent64* readdir64(DIR* dirp) {
     //puts("readdir64");
+    //trace("readdir64(dirp=%p)", dirp);
     if (sizeof(dirent64) == sizeof(dirent)) {
       return (struct dirent64*)readdir(dirp);
     }
@@ -227,6 +234,7 @@ extern "C" {
         it->second.info.already.insert(winevfs_lower(name));
       }
 
+      trace("readdir64(dirp=%p): %s", dirp, entry->d_name);
       //puts(entry->d_name);fflush(stdout);
 
       return entry;
@@ -246,6 +254,7 @@ extern "C" {
         continue;
 
       strcpy(it->second.temp64->d_name, filename.c_str());
+      trace("readdir64(dirp=%p) vfs: %s", dirp, it->second.temp->d_name);
       //puts(it->second.temp64->d_name);fflush(stdout);
 
       return it->second.temp64;
@@ -339,11 +348,14 @@ extern "C" {
   }
 
   int __xstat64(int ver, const char* path, struct stat64* buf) {
+    trace(" in: __xstat64(path=%s)", path);
     //puts("__xstat64");fflush(stdout);
     //puts(path);fflush(stdout);
     path = winevfs_get_path(path, Intent_Read, AT_FDCWD);
+    //trace("out: __xstat64(path=%s)", path);
     //puts(path);fflush(stdout);
     int ret = winevfs_stat(path, buf, false);
+    trace("ret: __xstat64(path=%s): %i", path, ret);
     //printf("ret: %i\n", ret);fflush(stdout);
     free((void*)path);
     return ret;
@@ -359,10 +371,13 @@ extern "C" {
       return __xstat64(ver, path, (struct stat64*)buf);
     }
 
+    trace(" in: __xstat(path=%s)", path);
+
     //puts(path);fflush(stdout);
     path = winevfs_get_path(path, Intent_Read, AT_FDCWD);
     //puts(path);fflush(stdout);
     int ret = winevfs____xstat(ver, path, buf);
+    trace("ret: __xstat(path=%s): %i", path, ret);
     free((void*)path);
     return ret;
   }
