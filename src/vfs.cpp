@@ -446,7 +446,6 @@ static void _add_read_entry(std::string source, std::string destination, bool is
     std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
     std::string parent_str = parent_path(source_path);
     std::string source_filename = source_path.filename();
-    winevfs_folder_mappings[lower(parent_str)].explored = true;
     winevfs_folder_mappings[lower(parent_str)].children.insert(source_filename);
   };
   //std::cout << source << std::endl;
@@ -458,10 +457,11 @@ void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::p
   source = winevfs_abspath(source);
   destination = winevfs_abspath(destination);
 
+  std::string lower_src = source;
+  lower_src = lower(lower_src);
+
   std::string wanted_entry;
   if (!search.empty()) {
-    std::string lower_src = source;
-    lower_src = lower(lower_src);
     search = lower(search);
 
     //printf("LowerSrc: %s\n", lower_src.c_str());
@@ -512,6 +512,8 @@ void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::p
         _add_read_entry(path, out);
       }
     }
+
+    winevfs_folder_mappings[lower_src].explored = true;
 
     winevfs__closedir(d);
 
@@ -899,7 +901,7 @@ static std::string find_read_mapping(std::string path, bool simple = false) {
     {
       std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
       auto it = winevfs_folder_mappings.find(path_str_lower);
-      if (it != winevfs_folder_mappings.end() && it->second.explored) {
+      if (it != winevfs_folder_mappings.end() && !it->second.explored) {
         //printf("Found empty path for: %s\n", path_str.c_str());fflush(stdout);
         foldervec = it->second.folder_paths.vector;
       } else {
