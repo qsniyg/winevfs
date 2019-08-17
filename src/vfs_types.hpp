@@ -17,5 +17,6 @@ struct folder_mapping {
   //std::string folderpath;
   unique_vector folder_paths;
 
+  bool explored = false;
   unique_vector children;
 };

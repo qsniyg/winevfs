@@ -188,7 +188,7 @@ extern "C" {
       }
 
       //trace("readdir: %s", entry->d_name);
-      trace("readdir(dirp=%p): %s", dirp, entry->d_name);
+      debug("readdir(dirp=%p): %s", dirp, entry->d_name);
       //puts(entry->d_name);fflush(stdout);
 
       return entry;
@@ -209,7 +209,7 @@ extern "C" {
 
       strcpy(it->second.temp->d_name, filename.c_str());
       //trace("readdir (vfs): %s", it->second.temp->d_name);
-      trace("readdir(dirp=%p) vfs: %s", dirp, it->second.temp->d_name);
+      debug("readdir(dirp=%p) vfs: %s", dirp, it->second.temp->d_name);
       //puts(it->second.temp->d_name);fflush(stdout);
 
       return it->second.temp;
@@ -234,7 +234,7 @@ extern "C" {
         it->second.info.already.insert(winevfs_lower(name));
       }
 
-      trace("readdir64(dirp=%p): %s", dirp, entry->d_name);
+      debug("readdir64(dirp=%p): %s", dirp, entry->d_name);
       //puts(entry->d_name);fflush(stdout);
 
       return entry;
@@ -254,7 +254,7 @@ extern "C" {
         continue;
 
       strcpy(it->second.temp64->d_name, filename.c_str());
-      trace("readdir64(dirp=%p) vfs: %s", dirp, it->second.temp->d_name);
+      debug("readdir64(dirp=%p) vfs: %s", dirp, it->second.temp->d_name);
       //puts(it->second.temp64->d_name);fflush(stdout);
 
       return it->second.temp64;

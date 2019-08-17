@@ -446,6 +446,7 @@ static void _add_read_entry(std::string source, std::string destination, bool is
     std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
     std::string parent_str = parent_path(source_path);
     std::string source_filename = source_path.filename();
+    winevfs_folder_mappings[lower(parent_str)].explored = true;
     winevfs_folder_mappings[lower(parent_str)].children.insert(source_filename);
   };
   //std::cout << source << std::endl;
@@ -898,7 +899,7 @@ static std::string find_read_mapping(std::string path, bool simple = false) {
     {
       std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
       auto it = winevfs_folder_mappings.find(path_str_lower);
-      if (it != winevfs_folder_mappings.end() && it->second.children.empty()) {
+      if (it != winevfs_folder_mappings.end() && it->second.explored) {
         //printf("Found empty path for: %s\n", path_str.c_str());fflush(stdout);
         foldervec = it->second.folder_paths.vector;
       } else {
@@ -906,14 +907,14 @@ static std::string find_read_mapping(std::string path, bool simple = false) {
         if (it == winevfs_folder_mappings.end()) {
           //printf("Not found path for: %s\n", path_str.c_str());fflush(stdout);
         } else {
-          if (false) {
-            printf("Not found empty path for: %s (but has children):\n", path_str.c_str());
+          if (true) {
+            //printf("Not found empty path for: %s (but has children):\n", path_str.c_str());
             if (!it->second.folder_paths.empty()) {
               printf("  %s\n", it->second.folder_paths.last().c_str());
             }
           }
 
-          if (false) {
+          if (true) {
             for (auto vit = it->second.children.vector.begin();
                  vit != it->second.children.vector.end();
                  vit++) {
