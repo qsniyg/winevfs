@@ -440,7 +440,7 @@ static void _add_read_entry(std::string source, std::string destination, bool is
   //std::cout << "RE: " << source << " -> " << destination << std::endl;
 
   std::filesystem::path source_path = source;
-  add_folder(parent_path(source_path), parent_path(destination));
+  add_folder(parent_path(source_path), std::filesystem::path());//parent_path(destination));
 
   {
     std::lock_guard<std::mutex> lock(winevfs_folder_mappings_mutex);
@@ -907,14 +907,14 @@ static std::string find_read_mapping(std::string path, bool simple = false) {
         if (it == winevfs_folder_mappings.end()) {
           //printf("Not found path for: %s\n", path_str.c_str());fflush(stdout);
         } else {
-          if (true) {
-            //printf("Not found empty path for: %s (but has children):\n", path_str.c_str());
+          if (false) {
+            printf("Not found empty path for: %s (but has children):\n", path_str.c_str());
             if (!it->second.folder_paths.empty()) {
               printf("  %s\n", it->second.folder_paths.last().c_str());
             }
           }
 
-          if (true) {
+          if (false) {
             for (auto vit = it->second.children.vector.begin();
                  vit != it->second.children.vector.end();
                  vit++) {
