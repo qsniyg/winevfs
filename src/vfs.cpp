@@ -184,7 +184,7 @@ static std::filesystem::path get_fd_path(int atfd) {
   return winevfs_get_fd_path(atfd);
 }
 
-std::filesystem::path full_abspath(std::filesystem::path source, int atfd) {
+std::filesystem::path winevfs_full_abspath(std::filesystem::path source, int atfd) {
   std::filesystem::path path = abspath_simple(source);
 
   if (path.is_absolute())
@@ -593,14 +593,14 @@ static std::mutex path_cache_mutex;
 static std::filesystem::path winpath(std::filesystem::path source, int atfd) {
   // TODO: maybe rewrite so that it checks the cache first?
   if (atfd != AT_FDCWD)
-    source = full_abspath(source, atfd);
+    source = winevfs_full_abspath(source, atfd);
 
   if (fs_exists(source)) {
     return source;
   }
 
   if (atfd == AT_FDCWD)
-    source = full_abspath(source, atfd);
+    source = winevfs_full_abspath(source, atfd);
 
   std::string path_str = source;
   path_str = lower(path_str);
@@ -653,13 +653,64 @@ std::string winevfs_winpath(std::string source, int atfd) {
   return winpath(source, atfd);
 }
 
+static std::string linwin_basename(char* in) {
+  char* last = strrchr(in, '/');
+  if (!last)
+    last = in;
+  else
+    last++;
+  char* newlast = strrchr(last, '\\');
+  if (!newlast)
+    newlast = last;
+  else
+    newlast++;
+
+  return newlast;
+}
+
+static std::string get_exe_filename() {
+  FILE* fp = (FILE*)winevfs__fopen("/proc/self/cmdline", "r");
+  if (!fp) {
+    return "";
+  }
+
+  char cmdline[512];
+  memset(cmdline, 0, sizeof(cmdline));
+  int size = fread(cmdline, 1, sizeof(cmdline) - 1, fp);
+  fclose(fp);
+
+  if (size > 0 && cmdline[size-1] == '\n')
+    cmdline[size-1] = 0;
+
+  if (size == 0)
+    return "";
+
+  // If it's not an absolute path, it'll run again
+  if (cmdline[0] != '/')
+    return "";
+
+  std::string filename = linwin_basename(cmdline);
+
+  if (filename == "wine" || filename == "wine64") {
+    int offset = strlen(cmdline) + 1;
+    if (offset < size) {
+      filename = linwin_basename(&cmdline[offset]);
+      filename = lower(filename);
+    }
+  } else {
+    filename = lower(filename);
+  }
+
+  return filename;
+}
+
 void winevfs_read_vfsfile(char* envfile) {
   FILE* fp = (FILE*)winevfs__fopen(envfile, "r");
   if (!fp) {
-    printf("Can't find vfs file at: %s\n", envfile);fflush(stdout);
+    info("Can't find vfs file at: %s", envfile);
     return;
   } else {
-    printf("Reading vfs file: %s\n", envfile);fflush(stdout);
+    info("Reading vfs file: %s", envfile);
   }
 
   ssize_t read;
@@ -687,20 +738,18 @@ void winevfs_read_vfsfile(char* envfile) {
         if (!strcmp(line, "?quick")) {
           quick = true;
         } else if (!strncmp(line, "?full=", sizeof("?full=") - 1)) {
-          char readlinked[PATH_MAX];
-          ssize_t bytes = winevfs__readlink("/proc/self/exe", readlinked, PATH_MAX - 1);
-          if (bytes <= 0) {
+          std::string filename = get_exe_filename();
+          if (filename.size() == 0)
             continue;
-          } else {
-            readlinked[bytes] = 0;
-          }
-
-          std::filesystem::path readlinked_path = readlinked;
 
           char* tok = strtok(line + (sizeof("?full=") - 1), ",");
           while (tok) {
-            if (!strcmp(tok, readlinked_path.filename().c_str())) {
+            std::string tok_str = tok;
+            tok_str = lower(tok_str);
+
+            if (tok_str == filename) {
               is_full = true;
+              info("VFS for %s will be read entirely", filename.c_str());
               break;
             }
 
@@ -773,7 +822,7 @@ void winevfs_read_vfsfile(char* envfile) {
     }
   }
 
-  printf("Found %i entries\n", entries);fflush(stdout);
+  info("Found %i entries", entries);
 
   free(line);
 

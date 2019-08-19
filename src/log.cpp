@@ -9,7 +9,7 @@
 //#define _GNU_SOURCE
 #include <stdio.h>
 
-int winevfs_log_level = WINEVFS_LOG_LEVEL_NONE;
+int winevfs_log_level = WINEVFS_LOG_LEVEL_INFO;
 
 static bool loglevel_inited = false;
 static std::mutex loglevel_inited_mutex;
@@ -21,7 +21,9 @@ static void init_loglevel() {
 
   char* loglevel = getenv("WINEVFS_LOGLEVEL");
   if (loglevel && loglevel[0]) {
-    if (!strcmp(loglevel, "info")) {
+    if (!strcmp(loglevel, "none")) {
+      winevfs_log_level = WINEVFS_LOG_LEVEL_NONE;
+    } else if (!strcmp(loglevel, "info")) {
       winevfs_log_level = WINEVFS_LOG_LEVEL_INFO;
     } else if (!strcmp(loglevel, "trace")) {
       winevfs_log_level = WINEVFS_LOG_LEVEL_TRACE;
