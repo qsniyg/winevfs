@@ -319,7 +319,8 @@ std::string unique_vector::last() {
   return this->vector.back();
 }
 
-// TODO: somehow make this work better multi-process
+static std::unordered_map<std::string, unique_vector> orig_read_mappings;
+static std::mutex orig_read_mappings_mutex;
 static std::unordered_map<std::string, std::string> read_mappings;
 static std::mutex read_mappings_mutex;
 static std::unordered_map<std::string, std::string> write_mappings;
@@ -458,6 +459,9 @@ void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::p
   source = winevfs_abspath(source);
   destination = winevfs_abspath(destination);
 
+  if (!fs_exists(destination))
+    return;
+
   std::string lower_src = source;
   lower_src = lower(lower_src);
 
@@ -484,7 +488,7 @@ void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::p
   }
 
   // Separate this so an inotify watch be added before calling opendir
-  if (fs_isdir(destination)) {
+  if (fs_isdir(destination, true)) {
     _add_read_entry(source, destination, true);
   }
 
@@ -806,6 +810,16 @@ void winevfs_read_vfsfile(char* envfile) {
               } else {
                 winevfs_add_simple_read_folder(input, output);
               }
+
+              std::string lowersource = lower(input);
+              auto orm_it = orig_read_mappings.find(lowersource);
+              if (orm_it != orig_read_mappings.end()) {
+                orm_it->second.insert(output);
+              } else {
+                unique_vector vec;
+                vec.insert(output);
+                orig_read_mappings[lowersource] = vec;
+              }
             } else {
               winevfs_add_read_file(input, output);
             }
@@ -960,6 +974,26 @@ void winevfs_init(bool client, bool force) {
   inited = true;
 }
 
+static std::string find_write_mapping(std::string path) {
+  std::string path_lower = lower(path);
+
+  std::lock_guard<std::mutex> lock(write_mappings_mutex);
+
+  for (auto it = write_mappings.begin(); it != write_mappings.end(); it++) {
+    if (!strncmp(path_lower.c_str(), it->first.c_str(), it->first.size())) {
+      const char* rest = path.c_str() + it->first.size();
+      if (rest[0] == '/')
+        rest++;
+
+      std::filesystem::path newpath = std::filesystem::path(it->second) / std::filesystem::path(rest);
+      newpath = winpath(newpath, AT_FDCWD);
+      return newpath;
+    }
+  }
+
+  return "";
+}
+
 static std::string find_read_mapping(std::string path, bool simple = false) {
   std::string path_lower = lower(path);
 
@@ -967,6 +1001,7 @@ static std::string find_read_mapping(std::string path, bool simple = false) {
     std::lock_guard<std::mutex> lock(read_mappings_mutex);
     auto it = read_mappings.find(path_lower);
     if (it != read_mappings.end()) {
+      debug("find_read_mapping: Found in read mappings: '%s'", path_lower.c_str());
       return it->second;
     }
   }
@@ -989,12 +1024,34 @@ static std::string find_read_mapping(std::string path, bool simple = false) {
       auto it = winevfs_folder_mappings.find(path_str_lower);
       if (it != winevfs_folder_mappings.end() && !it->second.explored) {
         //printf("Found empty path for: %s\n", path_str.c_str());fflush(stdout);
+        debug("find_read_mapping: Found unexplored folder at: '%s'", path_str.c_str());
+
         foldervec = it->second.folder_paths.vector;
+
+        // Add write mapping (temporary fix, the real fix would be to add all from orig_read_mappings)
+        std::string write_mapping = find_write_mapping(path_str);
+
+        if (write_mapping.size() > 0) {
+          debug("write mapping: %s", write_mapping.c_str());
+          foldervec.push_back(write_mapping);
+        }
       } else {
         // TODO: add cache
         if (it == winevfs_folder_mappings.end()) {
           //printf("Not found path for: %s\n", path_str.c_str());fflush(stdout);
         } else {
+          debug("find_read_mapping: Already explored folder '%s'", path_str.c_str());
+
+          if (false) {
+            for (auto vit = it->second.folder_paths.vector.begin();
+                 vit != it->second.folder_paths.vector.end();
+                 vit++) {
+              printf("    %s\n", vit->c_str());
+            }
+
+            fflush(stdout);
+          }
+
           if (false) {
             printf("Not found empty path for: %s (but has children):\n", path_str.c_str());
             if (!it->second.folder_paths.empty()) {
@@ -1019,10 +1076,18 @@ static std::string find_read_mapping(std::string path, bool simple = false) {
     if (!foldervec.empty()) {
       {
         std::lock_guard<std::mutex> processing_lock(winevfs_client_processing_mutex);
+
+        // The reason why nemesis fails is because overwrite isn't being properly monitored
+        // inotify gets hooked to a child directory, but not to its subchildren automatically
+        // Therefore, it has already explored the behaviors folder, but "overwrite" isn't in folder_paths
+        // One way to fix this is to have iterate through all of the top-level originally mapped folders
+        // (the folders listed in the vfs info file) instead of only folder_paths.
+        // Alternatively, we could just force-add the write folders
         for (auto fp_it = foldervec.begin();
              fp_it != foldervec.end();
              fp_it++) {
           //printf("Adding %s for %s\n", (*fp_it).c_str(), path_str_lower.c_str());fflush(stdout);
+          debug("find_read_mapping: Adding '%s' for '%s' (%s)", (*fp_it).c_str(), path_str_lower.c_str(), path_lower.c_str());
           winevfs_add_read_directory(path_str_lower, *fp_it, path_lower);
         }
       }
@@ -1126,6 +1191,8 @@ std::string winevfs_get_path_inner(std::filesystem::path in, Intent intent, int 
       return it->second;
     }
   };
+
+  debug("winevfs: Absolute lower path: %s", path_lower.c_str());
 
   std::string readmapping = find_read_mapping(path_lower);
   if (!readmapping.empty()) {
