@@ -8,6 +8,7 @@
 #include <string.h>
 #include <mutex>
 #include <unistd.h>
+#include "log.h"
 
 static std::unordered_map<int, std::string> fdtable;
 static std::unordered_map<std::string, int> reverse_fdtable;
@@ -146,6 +147,8 @@ void winevfs_watch_directory(std::string directory) {
   auto it = reverse_fdtable.find(directory);
   if (it != reverse_fdtable.end())
     return;
+
+  debug("winevfs_watch_directory(directory=%s)", directory.c_str());
 
   int fd = inotify_add_watch(inotify_fd, directory.c_str(),
                              IN_DELETE |

@@ -434,8 +434,8 @@ static void _add_read_entry(std::string source, std::string destination, bool is
     std::lock_guard<std::mutex> lock(read_mappings_mutex);
     read_mappings[lower(source)] = destination;
   } else {
-    add_folder(source, destination);
     winevfs_watch_directory(destination);
+    add_folder(source, destination);
   }
 
   //std::cout << "RE: " << source << " -> " << destination << std::endl;
@@ -483,10 +483,13 @@ void winevfs_add_read_directory(std::filesystem::path source, std::filesystem::p
     }
   }
 
+  // Separate this so an inotify watch be added before calling opendir
+  if (fs_isdir(destination)) {
+    _add_read_entry(source, destination, true);
+  }
+
   DIR* d = fs_opendir(destination);
   if (d) {
-    _add_read_entry(source, destination, true);
-
     struct dirent* entry;
     while ((entry = (struct dirent*)winevfs__readdir(d)) != NULL) {
       if (entry->d_name[0] == '.') {
@@ -1108,6 +1111,7 @@ std::string winevfs_get_path_inner(std::filesystem::path in, Intent intent, int 
   // TODO: Don't load the entire read mappings at once. Load them as they're needed
   // FIXME: inotify R events will overwrite the current file, even if they're
   //   from a folder that's much lower in the load order
+  // TODO: If if the file doesn't exist, use the overwrite instead
 
   if (false) {
     std::lock_guard<std::mutex> lock(read_mappings_mutex);
