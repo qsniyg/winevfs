@@ -901,12 +901,16 @@ static void listener_cb(fs_event event) {
 
     if (!found) {
       //puts("NOT FOUND");fflush(stdout);
+      trace("inotify_cb(type=R, file=%s, isdir=%i, parent=%s): Parent not found", event.file.c_str(), event.isdir, lower_path.c_str());
       return;
     }
 
     newpath = newpath / path.filename();
+    std::string parent = lower_path;
     lower_path = newpath;
     lower_path = lower(lower_path);
+
+    trace("inotify_cb(type=R, file=%s, isdir=%i, parent=%s, newpath=%s)", event.file.c_str(), event.isdir, parent.c_str(), newpath.c_str());
 
     //printf("FP: %s\n", lower_path.c_str());fflush(stdout);
 
@@ -918,6 +922,7 @@ static void listener_cb(fs_event event) {
   } else {
     //puts("DELETE:");fflush(stdout);
     //printf("file: %s\n", event.file.c_str());fflush(stdout);
+    trace("inotify_cb(type=D, file=%s, isdir=%i)", event.file.c_str(), event.isdir);
     winevfs_delete_file(event.file);
   }
 }

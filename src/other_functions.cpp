@@ -254,7 +254,7 @@ extern "C" {
         continue;
 
       strcpy(it->second.temp64->d_name, filename.c_str());
-      debug("readdir64(dirp=%p) vfs: %s", dirp, it->second.temp->d_name);
+      debug("readdir64(dirp=%p) vfs: %s", dirp, it->second.temp64->d_name);
       //puts(it->second.temp64->d_name);fflush(stdout);
 
       return it->second.temp64;
