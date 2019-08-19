@@ -21,25 +21,6 @@ int main(int argc, char** argv) {
     }
   }
 
-  FILE* fp = (FILE*)winevfs__fopen("/tmp/.winevfs/vfsinfo_patch", "w");
-  if (fp) {
-    fputs("quick\n", fp);
-    fflush(fp);
-    fclose(fp);
-  }
-
-  if (false && fork() == 0) {
-    return !winevfs_init_server((char*)"/tmp/.winevfs/vfsinfo_patch");
-  }
-
-  if (false) {
-    puts("[winevfs] Loading VFS file");
-    winevfs_init();
-    puts("[winevfs] Writing VFS file");
-    winevfs_write_vfsfile((char*)"/tmp/.winevfs/vfsinfo");
-    setenv("WINEVFS_VFSFILE", "/tmp/.winevfs/vfsinfo", true);
-  }
-
   char self_path[PATH_MAX];
   self_path[0] = 0;
   ssize_t bytes = winevfs__readlink("/proc/self/exe", self_path, PATH_MAX - 1);
