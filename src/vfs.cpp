@@ -667,11 +667,13 @@ void winevfs_read_vfsfile(char* envfile) {
   char* line = NULL;
 
   bool quick = false;
+  bool is_full = false;
   bool first = true;
 
   int phase = 0;
   bool is_read = false;
   bool is_delete = false;
+
   std::string input = "";
   std::string output = "";
   int entries = 0;
@@ -681,12 +683,34 @@ void winevfs_read_vfsfile(char* envfile) {
     line[strlen(line) - 1] = 0;
 
     if (first) {
-      first = false;
+      if (line[0] == '?') {
+        if (!strcmp(line, "?quick")) {
+          quick = true;
+        } else if (!strncmp(line, "?full=", sizeof("?full=") - 1)) {
+          char readlinked[PATH_MAX];
+          ssize_t bytes = winevfs__readlink("/proc/self/exe", readlinked, PATH_MAX - 1);
+          if (bytes <= 0) {
+            continue;
+          } else {
+            readlinked[bytes] = 0;
+          }
 
-      if (!strcmp(line, "quick")) {
-        quick = true;
+          std::filesystem::path readlinked_path = readlinked;
+
+          char* tok = strtok(line + (sizeof("?full=") - 1), ",");
+          while (tok) {
+            if (!strcmp(tok, readlinked_path.filename().c_str())) {
+              is_full = true;
+              break;
+            }
+
+            tok = strtok(NULL, ",");
+          }
+        }
         continue;
       }
+
+      first = false;
     }
 
     if (phase == 0) {
@@ -725,7 +749,11 @@ void winevfs_read_vfsfile(char* envfile) {
           } else {
             //winevfs_add_read_directory(input, output);
             if (fs_isdir(output)) {
-              winevfs_add_simple_read_folder(input, output);
+              if (is_full) {
+                winevfs_add_read_directory(input, output);
+              } else {
+                winevfs_add_simple_read_folder(input, output);
+              }
             } else {
               winevfs_add_read_file(input, output);
             }
@@ -755,7 +783,7 @@ void winevfs_read_vfsfile(char* envfile) {
 void winevfs_write_vfsfile(char* envfile) {
   FILE* fp = (FILE*)winevfs__fopen(envfile, "w");
 
-  fputs("quick\n", fp);
+  fputs("?quick\n", fp);
 
   for (auto it = read_mappings.begin(); it != read_mappings.end(); it++) {
     fputs("R\n", fp);
