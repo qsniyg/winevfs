@@ -5,6 +5,9 @@
 #ifndef SERVER_BUILD
 #define SERVER_BUILD
 #endif
+#ifndef VERSION
+#define VERSION "(unknown)"
+#endif
 #include "server.hpp"
 #include "log.h"
 #include <iostream>
@@ -20,6 +23,11 @@ int main(int argc, char** argv) {
     while (*env) {
       puts(*env++);
     }
+  }
+
+  if (argc < 2) {
+    printf(" - winevfs " VERSION " -\nUsage: winevfs PROGRAM [ARGUMENTS...]\n");
+    return 0;
   }
 
   char self_path[PATH_MAX];
