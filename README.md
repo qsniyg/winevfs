@@ -25,6 +25,8 @@ There are also a number of limitations that may or may not be addressed in futur
    may not be properly registered
  * Performance is currently not as good as it could be. There are some ways it can be improved,
    including better caching and a few executable-specific hacks. These are planned for a future version.
+   * This has been partly fixed through the `?full=` option (allowing certain whitelisted executables to
+     read the entire VFS before loading)
  * This has only been tested with Bethesda games, and a few tools related to them.
  * wineserver must not be already running prior to this, as it needs to hook LD_PRELOAD into it
    in order to function.
