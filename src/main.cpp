@@ -50,10 +50,6 @@ int main(int argc, char** argv) {
     setenv("WINEVFS_VFSFILE", path.c_str(), true);
   }
 
-  if (argc < 2) {
-    return 0;
-  }
-
   char* args[argc];
   memcpy(args, argv + 1, (argc - 1) * sizeof(char*));
   args[argc - 1] = NULL;
