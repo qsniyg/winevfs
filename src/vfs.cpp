@@ -799,7 +799,7 @@ void winevfs_read_vfsfile(char* envfile) {
             //winevfs_add_read_directory(input, output);
             if (fs_isdir(output)) {
               if (is_full) {
-                winevfs_add_read_directory(input, output);
+                winevfs_add_read_directory(input, output, "", true);
               } else {
                 winevfs_add_simple_read_folder(input, output);
               }
