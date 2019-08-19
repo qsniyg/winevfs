@@ -6,6 +6,7 @@
 #define SERVER_BUILD
 #endif
 #include "server.hpp"
+#include "log.h"
 #include <iostream>
 #include <limits.h>
 #include <stdlib.h>

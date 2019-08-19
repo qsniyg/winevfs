@@ -14,6 +14,7 @@
 #include <string.h>
 #include <iostream>
 #include "functions.hpp"
+#include "log.h"
 
 // TODO: improve
 std::string winevfs_lower(std::string& in) {
@@ -857,6 +858,7 @@ void winevfs_init(bool client, bool force) {
     inited = true;
     return;
   }
+
 
   if (client) {
     //winevfs_init_client(server_client_cb);
