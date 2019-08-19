@@ -850,8 +850,7 @@ void winevfs_init(bool client, bool force) {
   if (inited && !force)
     return;
 
-  // TODO: empty this directory
-  fs_mkdir_p("/tmp/.winevfs/fakedir/");
+  fs_mkdir_p("/tmp/.winevfs");
 
   char* envfile = getenv("WINEVFS_VFSFILE");
   if (!envfile || !envfile[0]) {
