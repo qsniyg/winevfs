@@ -44,12 +44,12 @@ Programs that currently work (tested):
  * Skyrim (LE)
  * Fallout 4
  * Fallout NV
- * FNIS (requires `dotnet40` to work)
+ * FNIS (requires dotnet40 to work)
  * Bodyslide
 
 Programs that do not work (yet):
 
- * Nemesis Unlimited Behavior Engine (requires wine-mono to work, it fails under `dotnet40`)
+ * Nemesis Unlimited Behavior Engine (requires wine-mono to work, it fails under dotnet40)
    * It's a heavily multithreaded application, which currently fails due to a few thread races
    * I'm currently trying to fix it
 
