@@ -1,5 +1,11 @@
 ## winevfs
 
+### Please don't use this unless you need to. USVFS/ModOrganizer 2 should work out of the box under wine now.
+
+Winevfs was an earlier attempt to allow Bethesda games modding to work under linux, but it's quite buggy and slow. Notably, programs such as Nemesis don't work at all when using winevfs.
+
+---
+
 This is a virtual filesystem for wine, written primarily as a native linux alternative
 to Mod Organizer's USVFS (which is currently broken under wine).
 
